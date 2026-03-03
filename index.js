@@ -163,7 +163,7 @@ if (reversed == null) { reversed = false; }
 
 
 // stage content:
-(lib.Untitled1 = function(mode,startPosition,loop,reversed) {
+(lib.CodeCanvas = function(mode,startPosition,loop,reversed) {
 if (loop == null) { loop = true; }
 if (reversed == null) { reversed = false; }
 	var props = new Object();
@@ -184,13 +184,6 @@ if (reversed == null) { reversed = false; }
 		if(this.totalFrames == 1) {
 			this.isSingleFrame = true;
 		}
-		/* 
-		    ================================================================
-		    ALGORITHM VISUALIZER - v8.14 (FULL RESTORATION + UI FIX)
-		    Bubble, Selection, Insertion, Quick, Merge, BST, Search...
-		    ================================================================
-		*/
-		
 		this.stop();
 		var root = this;
 		
