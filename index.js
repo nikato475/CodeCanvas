@@ -299,9 +299,9 @@ if (reversed == null) { reversed = false; }
 		    panel.style.cssText = "position:absolute; left:10px; top:10px; padding:15px; background:rgba(0,0,0,0.9); color:white; border-radius:12px; width:250px; z-index:10000; font-family:Arial; box-shadow:0 10px 30px rgba(0,0,0,0.5); border:1px solid #444;";
 		
 		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">ALGO ENGINE V8.18</div>';
-		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option><option value="networks">NETWORKS</option></select></div>';
+		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option></select></div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">ALGORITHM: <select id="v8_algoSelect" style="width:145px; float:right;"></select></div>';
-		    html += '<div style="font-size:11px; margin-bottom:10px; color:#aaa;"><i>*Graph: Use "A" for node, "A-B" for edge</i></div>';
+		    html += '<div style="font-size:11px; margin-bottom:10px; color:#aaa;"></div>';
 		
 		    
 		    html += '<div id="v8_barArea" style="display:block; margin-top:10px;">Size: <input type="range" id="v8_sizeSlider" min="5" max="40" value="15" style="width:70%;"></div>';
