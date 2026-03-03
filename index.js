@@ -206,7 +206,9 @@ if (reversed == null) { reversed = false; }
 		window.v8SortData = [];
 		window.v8ListData = [10, 20, 30, 40, 50];
 		window.v8TreeData = null; 
+		window.v8GraphData = { nodes: [], adj: {} }; // NEW: Graph Data
 		window.v8Generator = null;
+		
 		window.v8IsPaused = true;
 		window.v8IsComplete = false; 
 		window.v8FoundIdx = -1; // NEW: Persist search result
@@ -230,7 +232,9 @@ if (reversed == null) { reversed = false; }
 		    binarysearch: { code: ["mid = (low+high)/2", "if (target == mid) FOUND", "else if (target < mid) high=mid-1", "else low=mid+1"], t: "O(log n)" },
 		    linearsearch: { code: ["for (item in list)", "  if (item == target) FOUND", "return NOT FOUND"], t: "O(n)" },
 		    linkedlist: { code: ["temp = head;", "while(temp != NULL) {", "  if(temp->data == target) FOUND", "  temp = temp->next;", "}"], t: "O(n)" },
-		    binarytree: { code: ["if (target < node->val) delete left", "else if (target > node->val) delete right", "else handle case 1/2/3"], t: "O(log n)" }
+		    binarytree: { code: ["if (target < node->val) delete left", "else if (target > node->val) delete right", "else handle case 1/2/3"], t: "O(log n)" },
+		    bfs: { code: ["queue.push(start)", "while(!queue.empty)", "  v = queue.pop()", "  for neighbor in v.adj: push(neighbor)"], t: "O(V + E)" },
+		    dfs: { code: ["visit(u): marked[u] = true", "  for neighbor in u.adj:", "    if !marked[neighbor]: visit(neighbor)"], t: "O(V + E)" }
 		};
 		
 		// --- 2. WebSocket & Sync ---
@@ -239,7 +243,7 @@ if (reversed == null) { reversed = false; }
 		    var check = setInterval(function() {
 		        if (window.io) {
 		            clearInterval(check);
-		            socket = io("https://CodeCanvas.onrender.com");
+		            socket = io("http://localhost:3000");
 		            socket.on("connect", () => { updateStatus("Sync Active (v8.1)"); socket.emit("join-room", "sorting-room-1"); });
 		            socket.on("sync-step", (inc) => {
 		                if (inc.origin === window.v8SessionId) return; 
@@ -299,11 +303,13 @@ if (reversed == null) { reversed = false; }
 		function setupUI() {
 		    if (document.getElementById("v8_panel")) return;
 		    var panel = document.createElement("div"); panel.id = "v8_panel";
-		    panel.style.cssText = "position:absolute; left:20px; top:10px; padding:15px; background:rgba(0,0,0,0.96); color:white; border-radius:12px; width:280px; z-index:10000; font-family:Arial;";
+		    panel.style.cssText = "position:absolute; left:10px; top:10px; padding:15px; background:rgba(0,0,0,0.9); color:white; border-radius:12px; width:250px; z-index:10000; font-family:Arial; box-shadow:0 10px 30px rgba(0,0,0,0.5); border:1px solid #444;";
 		
-		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">ALGO ENGINE V8.14</div>';
-		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option></select></div>';
+		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">ALGO ENGINE V8.18</div>';
+		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option><option value="networks">NETWORKS</option></select></div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">ALGORITHM: <select id="v8_algoSelect" style="width:145px; float:right;"></select></div>';
+		    html += '<div style="font-size:11px; margin-bottom:10px; color:#aaa;"><i>*Graph: Use "A" for node, "A-B" for edge</i></div>';
+		
 		    
 		    html += '<div id="v8_barArea" style="display:block; margin-top:10px;">Size: <input type="range" id="v8_sizeSlider" min="5" max="40" value="15" style="width:70%;"></div>';
 		
@@ -352,8 +358,12 @@ if (reversed == null) { reversed = false; }
 		    } else if(window.v8Cat === "hierarchy") {
 		        barArea.style.display="none"; actArea.style.display="block"; delBtn.style.display="block";
 		        ["binarytree"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text="BST"; aSel.add(o); });
+		    } else if(window.v8Cat === "networks") {
+		        barArea.style.display="none"; actArea.style.display="block"; delBtn.style.display="block";
+		        ["bfs", "dfs"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text=a.toUpperCase(); aSel.add(o); });
 		    }
 		    aSel.value = window.v8Algo;
+		
 		    if(!skipInit) initData(); 
 		    renderCode(); refreshStage();
 		}
@@ -545,9 +555,22 @@ if (reversed == null) { reversed = false; }
 		}
 		
 		window.v8_handleInsert = function() {
-		    var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return;
+		    var raw = document.getElementById("v8_val_input").value.trim().toUpperCase(); if(!raw) return;
 		    stopAnimation(); window.v8IsPaused = false; 
-		    window.v8IsComplete = false; window.v8FoundIdx = -1; // RESET STATE FOR NEW OP
+		    window.v8IsComplete = false; window.v8FoundIdx = -1;
+		    if(window.v8Cat === "networks") {
+		        if(raw.includes("-")) {
+		            var pts = raw.split("-"); 
+		            if(!window.v8GraphData.adj[pts[0]]) window.v8GraphData.adj[pts[0]]=[];
+		            if(!window.v8GraphData.adj[pts[1]]) window.v8GraphData.adj[pts[1]]=[];
+		            if(window.v8GraphData.adj[pts[0]].indexOf(pts[1])===-1) window.v8GraphData.adj[pts[0]].push(pts[1]);
+		            if(window.v8GraphData.adj[pts[1]].indexOf(pts[0])===-1) window.v8GraphData.adj[pts[1]].push(pts[0]);
+		        } else {
+		            if(window.v8GraphData.nodes.indexOf(raw)===-1) window.v8GraphData.nodes.push(raw);
+		        }
+		        refreshStage(); return;
+		    }
+		    var val = parseInt(raw);
 		    if(window.v8Algo === "binarytree") {
 		        window.v8Generator = bstInsertGen(val);
 		    } else if(window.v8Algo === "linkedlist") {
@@ -558,15 +581,22 @@ if (reversed == null) { reversed = false; }
 		    doStep(true); startEngine();
 		};
 		window.v8_handleSearch = function() {
-		    var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return;
+		    var raw = document.getElementById("v8_val_input").value.trim().toUpperCase(); if(!raw) return;
 		    stopAnimation(); window.v8IsPaused = false;
-		    window.v8IsComplete = false; window.v8FoundIdx = -1; // RESET STATE FOR NEW OP
+		    window.v8IsComplete = false; window.v8FoundIdx = -1;
+		    if(window.v8Cat === "networks") {
+		        if(window.v8Algo === "bfs") window.v8Generator = bfsGen(raw);
+		        else if(window.v8Algo === "dfs") window.v8Generator = dfsGen(raw);
+		        doStep(true); startEngine(); return;
+		    }
+		    var val = parseInt(raw);
 		    if(window.v8Algo === "linearsearch") window.v8Generator = linearSearchArrayGen(val);
 		    else if(window.v8Algo === "binarysearch") window.v8Generator = binarySearchGen(val);
 		    else if(window.v8Algo === "binarytree") window.v8Generator = bstSearchGen(val);
 		    else if(window.v8Algo === "linkedlist") window.v8Generator = linkedListSearchGen(val);
 		    doStep(true); startEngine();
 		};
+		
 		window.v8_handleDelete = function() {
 		    var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return;
 		    stopAnimation(); window.v8IsPaused = false;
@@ -596,10 +626,14 @@ if (reversed == null) { reversed = false; }
 		}
 		
 		function refreshStage(hArray, hColor, hTreeVal) {
-		    if(!root.stageArea) return; root.stageArea.removeAllChildren();
+		    if(!root.stageArea) { root.stageArea = new createjs.Container(); root.addChild(root.stageArea); }
+		    root.stageArea.removeAllChildren();
 		    
+		    var offset = 50; // CONSTANT SAFETY MARGIN
+		    var drawW = stageW - offset; 
+		
 		    if (window.v8Cat === "sorting" || window.v8Cat === "searching") {
-		        var n = window.v8SortData.length, bw = (stageW/n)*0.8, sp = (stageW/n)*0.2;
+		        var n = window.v8SortData.length, bw = (drawW/n)*0.8, sp = (drawW/n)*0.2;
 		        for (var i=0; i<n; i++) {
 		            var bh=(window.v8SortData[i]/100)*stageH, b=new createjs.Shape();
 		            var isH = hArray && hArray.indexOf(i) !== -1;
@@ -608,10 +642,11 @@ if (reversed == null) { reversed = false; }
 		            var isFound = (window.v8FoundIdx === i);
 		            var barColor = (window.v8IsComplete && window.v8Cat === "sorting") ? "#28a745" : (isFound ? "#28a745" : (isH ? hColor : "hsl(200,70%,50%)"));
 		            b.graphics.beginFill(barColor).drawRect(0,0,bw,-bh);
-		            b.x=i*(bw+sp)+(sp/2); b.y=stageH; root.stageArea.addChild(b);
+		            b.x = offset + i*(bw+sp)+(sp/2); b.y=stageH; root.stageArea.addChild(b);
 		            
 		            // HIGH-CONTRAST PLACARDS (v8.4)
 		            var labelColor = (isFound || isH) ? "#ff0" : "#fff";
+		
 		            var fontSize = Math.min(13, bw * 0.9);
 		            if (fontSize > 8) {
 		                // 1. Background Rect
@@ -633,7 +668,7 @@ if (reversed == null) { reversed = false; }
 		            }
 		        }
 		    } else if (window.v8Cat === "linear") {
-		        var sX=100, cY=200, gap=120, rad=25;
+		        var sX=offset + 60, cY=200, gap=110, rad=25;
 		        for (var i=0; i<window.v8ListData.length; i++) {
 		            var x=sX+i*gap;
 		            var isFound = (window.v8FoundIdx === i);
@@ -642,9 +677,65 @@ if (reversed == null) { reversed = false; }
 		            if(i<window.v8ListData.length-1) drawLine(x+rad, cY, x+gap-rad, cY);
 		        }
 		    } else if (window.v8Cat === "hierarchy") {
-		        renderBSTRecursive(window.v8TreeData, stageW/2, 60, stageW/4, hTreeVal, hColor);
+		        renderBSTRecursive(window.v8TreeData, offset + (drawW/2), 60, drawW/4, hTreeVal, hColor);
+		    } else if (window.v8Cat === "networks") {
+		        var nodes = window.v8GraphData.nodes;
+		        var adj = window.v8GraphData.adj;
+		        var nodeCoords = {};
+		        // Layout: Circular
+		        nodes.forEach((n, idx) => {
+		            var ang = (idx / nodes.length) * Math.PI * 2;
+		            var nx = offset + drawW/2 + Math.cos(ang) * 120;
+		            var ny = stageH/2 + Math.sin(ang) * 100;
+		            nodeCoords[n] = {x: nx, y: ny};
+		        });
+		        // Draw Edges
+		        nodes.forEach(u => {
+		            (adj[u]||[]).forEach(v => {
+		                if(u < v) drawLine(nodeCoords[u].x, nodeCoords[u].y, nodeCoords[v].x, nodeCoords[v].y);
+		            });
+		        });
+		        // Draw Nodes
+		        nodes.forEach(n => {
+		            var isH = (hArray && hArray.indexOf(n) !== -1);
+		            root.stageArea.addChild(drawNode(nodeCoords[n].x, nodeCoords[n].y, n, isH, hColor));
+		        });
 		    }
 		}
+		function* bfsGen(startNode) {
+		    if(!window.v8GraphData.nodes.includes(startNode)) return;
+		    var queue = [startNode], visited = [startNode];
+		    while(queue.length > 0) {
+		        var curr = queue.shift();
+		        refreshStage([curr], "yellow"); yield;
+		        var neighbors = window.v8GraphData.adj[curr] || [];
+		        for(var n of neighbors) {
+		            if(!visited.includes(n)) {
+		                visited.push(n); queue.push(n);
+		                refreshStage([n], "rgba(255,255,0,0.3)"); yield;
+		            }
+		        }
+		        refreshStage([curr], "#28a745");
+		    }
+		    window.v8IsComplete = true; refreshStage();
+		}
+		function* dfsGen(startNode) {
+		    if(!window.v8GraphData.nodes.includes(startNode)) return;
+		    var stack = [startNode], visited = [];
+		    while(stack.length > 0) {
+		        var curr = stack.pop();
+		        if(!visited.includes(curr)) {
+		            visited.push(curr);
+		            refreshStage([curr], "yellow"); yield;
+		            var neighbors = window.v8GraphData.adj[curr] || [];
+		            for(var n of neighbors) {
+		                if(!visited.includes(n)) stack.push(n);
+		            }
+		        }
+		    }
+		    window.v8IsComplete = true; refreshStage();
+		}
+		
 		
 		function renderBSTRecursive(node, x, y, xOffset, hVal, hColor) {
 		    if (!node) return;
@@ -663,10 +754,11 @@ if (reversed == null) { reversed = false; }
 		    window.v8IsComplete=false;
 		    window.v8FoundIdx = -1;
 		    if(window.v8Cat === "sorting" || window.v8Cat === "searching") initData();
-		
 		    if(window.v8Cat === "hierarchy") window.v8TreeData = null; 
 		    if(window.v8Cat === "linear") window.v8ListData = []; 
+		    if(window.v8Cat === "networks") window.v8GraphData = { nodes: [], adj: {} };
 		    resetCounters();
+		
 		    refreshStage(); 
 		}
 		function updateStatus(t) { var el=document.getElementById("v8_status"); if(el) el.innerText=t; }
@@ -697,17 +789,17 @@ if (reversed == null) { reversed = false; }
 
 	this.resetBtn = new lib.RESET();
 	this.resetBtn.name = "resetBtn";
-	this.resetBtn.setTransform(536.2,600.6,0.8745,0.6441,0,0,0,41.8,28.9);
+	this.resetBtn.setTransform(561.75,600.6,0.8745,0.6441,0,0,0,41.8,28.9);
 	new cjs.ButtonHelper(this.resetBtn, 0, 1, 1);
 
 	this.pauseBtn = new lib.PAUSE();
 	this.pauseBtn.name = "pauseBtn";
-	this.pauseBtn.setTransform(413.75,600.75,0.8745,0.6441,0,0,0,41.8,29.1);
+	this.pauseBtn.setTransform(439.3,600.75,0.8745,0.6441,0,0,0,41.8,29.1);
 	new cjs.ButtonHelper(this.pauseBtn, 0, 1, 1);
 
 	this.beginBtn = new lib.BEGIN_Btn_Component();
 	this.beginBtn.name = "beginBtn";
-	this.beginBtn.setTransform(290.75,598.35,0.8745,0.6441,0,0,0,41.5,25.4);
+	this.beginBtn.setTransform(316.3,598.35,0.8745,0.6441,0,0,0,41.5,25.4);
 	new cjs.ButtonHelper(this.beginBtn, 0, 1, 1);
 
 	this.shape = new cjs.Shape();
