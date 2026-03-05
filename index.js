@@ -298,7 +298,7 @@ if (reversed == null) { reversed = false; }
 		    var panel = document.createElement("div"); panel.id = "v8_panel";
 		    panel.style.cssText = "position:absolute; left:10px; top:10px; padding:15px; background:rgba(0,0,0,0.9); color:white; border-radius:12px; width:250px; z-index:10000; font-family:Arial; box-shadow:0 10px 30px rgba(0,0,0,0.5); border:1px solid #444;";
 		
-		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">ALGO ENGINE V8.18</div>';
+		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">CodeCanvas</div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option></select></div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">ALGORITHM: <select id="v8_algoSelect" style="width:145px; float:right;"></select></div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px; color:#aaa;"></div>';
@@ -328,7 +328,7 @@ if (reversed == null) { reversed = false; }
 		    document.body.appendChild(panel);
 		
 		    document.getElementById("v8_catSelect").onchange = function() { window.v8Cat = this.value; updateUIMode(); resetProject(); broadcast("Cat Switch",null,null,null,"UI_CHANGE"); };
-		    document.getElementById("v8_algoSelect").onchange = function() { window.v8Algo = this.value; renderCode(); resetProject(); broadcast("Algo Switch",null,null,null,"UI_CHANGE"); };
+		    document.getElementById("v8_algoSelect").onchange = function() { window.v8Algo = this.value; resetProject(); broadcast("Algo Switch",null,null,null,"UI_CHANGE"); };
 		    document.getElementById("v8_speedSlider").oninput = function() { window.v8Speed = parseInt(this.value); if(window.v8Interval) startEngine(); };
 		    document.getElementById("v8_sizeSlider").oninput = function() { window.v8ArraySize = parseInt(this.value); initData(); };
 		    document.getElementById("v8_stepBtn").onclick = function() { window.v8IsPaused = true; doStep(true); };
@@ -355,13 +355,6 @@ if (reversed == null) { reversed = false; }
 		        barArea.style.display="none"; actArea.style.display="block"; delBtn.style.display="block";
 		        ["bfs", "dfs"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text=a.toUpperCase(); aSel.add(o); });
 		    }
-		    
-		    // Ensure window.v8Algo matches the new dropdown list
-		    var found = false;
-		    for(var i=0; i<aSel.options.length; i++) {
-		        if(aSel.options[i].value === window.v8Algo) found = true;
-		    }
-		    if(!found && aSel.options.length > 0) window.v8Algo = aSel.options[0].value;
 		    aSel.value = window.v8Algo;
 		
 		    if(!skipInit) initData(); 
@@ -374,7 +367,6 @@ if (reversed == null) { reversed = false; }
 		    if (!window.v8Generator) {
 		        compareCount = 0; swapCount = 0; 
 		        window.v8IsComplete = false;
-		        highlightCode(-1); // Reset highlight when starting new
 		        if(window.v8Algo === "bubble") window.v8Generator = bubbleSortGen();
 		        else if(window.v8Algo === "selection") window.v8Generator = selectionSortGen();
 		        else if(window.v8Algo === "insertion") window.v8Generator = insertionSortGen();
@@ -383,34 +375,25 @@ if (reversed == null) { reversed = false; }
 		        else return;
 		    }
 		    var res = window.v8Generator.next();
-		    var currLine = res.value; // Get line number from yield
-		    
-		    if(currLine !== undefined && currLine !== null) {
-		        highlightCode(currLine);
-		    }
-		
 		    if (res.done) { 
 		        window.v8IsComplete = true; 
 		        stopAnimation(); 
 		        updateStatus("Algorithm Complete!"); 
 		        refreshStage(); 
-		        highlightCode(-1);
 		    }
 		    // ALWAYS BROADCAST (isLocal or auto-interval) to keep everyone in sync
-		    broadcast("Step", null, null, currLine, isLocal ? "MANUAL_STEP" : "AUTO", null);
+		    broadcast("Step", null, null, null, isLocal ? "MANUAL_STEP" : "AUTO", null);
 		}
 		
 		// --- Sorting Generators ---
 		function* bubbleSortGen() {
 		    for (var i=0; i<window.v8SortData.length-1; i++) {
-		        yield 0;
 		        for (var j=0; j<window.v8SortData.length-i-1; j++) {
-		            yield 1;
-		            compareCount++; updateCounters(); refreshStage([j, j+1], "yellow"); yield 2;
+		            compareCount++; updateCounters(); refreshStage([j, j+1], "yellow"); yield;
 		            if (window.v8SortData[j] > window.v8SortData[j+1]) {
 		                swapCount++; updateCounters();
 		                var t=window.v8SortData[j]; window.v8SortData[j]=window.v8SortData[j+1]; window.v8SortData[j+1]=t;
-		                refreshStage([j, j+1], "red"); yield 3;
+		                refreshStage([j, j+1], "red"); yield;
 		            }
 		        }
 		    }
@@ -418,62 +401,53 @@ if (reversed == null) { reversed = false; }
 		
 		function* selectionSortGen() {
 		    for (var i=0; i<window.v8SortData.length-1; i++) {
-		        yield 0;
-		        var min=i; refreshStage([min], "orange"); yield 1;
+		        var min=i; refreshStage([min], "orange"); yield;
 		        for (var j=i+1; j<window.v8SortData.length; j++) {
-		            compareCount++; updateCounters(); refreshStage([min, j], "yellow"); yield 2;
-		            if (window.v8SortData[j] < window.v8SortData[min]) { min=j; refreshStage([min], "orange"); yield 2; }
+		            compareCount++; updateCounters(); refreshStage([min, j], "yellow"); yield;
+		            if (window.v8SortData[j] < window.v8SortData[min]) { min=j; refreshStage([min], "orange"); yield; }
 		        }
 		        swapCount++; updateCounters(); var t=window.v8SortData[min]; window.v8SortData[min]=window.v8SortData[i]; window.v8SortData[i]=t;
-		        refreshStage([i, min], "#28a745"); yield 3;
+		        refreshStage([i, min], "#28a745"); yield;
 		    }
 		}
 		
 		function* insertionSortGen() {
 		    for (var i=1; i<window.v8SortData.length; i++) {
-		        yield 0;
-		        var key=window.v8SortData[i], j=i-1; refreshStage([i], "orange"); yield 1;
+		        var key=window.v8SortData[i], j=i-1; refreshStage([i], "orange"); yield;
 		        while(j>=0 && window.v8SortData[j]>key) {
 		            compareCount++; updateCounters(); window.v8SortData[j+1]=window.v8SortData[j];
-		            refreshStage([j, j+1], "red"); yield 2; j--;
+		            refreshStage([j, j+1], "red"); yield; j--;
 		        }
-		        window.v8SortData[j+1]=key; refreshStage([j+1], "#28a745"); yield 3;
+		        window.v8SortData[j+1]=key; refreshStage([j+1], "#28a745"); yield;
 		    }
 		}
 		
 		function* quickSortGen(l, h) {
 		    if (l < h) {
 		        var p = yield* partition(l, h);
-		        yield 1;
 		        yield* quickSortGen(l, p - 1);
-		        yield 2;
 		        yield* quickSortGen(p + 1, h);
-		        yield 3;
 		    }
 		}
 		function* partition(l, h) {
-		    var pvt = window.v8SortData[h], i = l - 1; refreshStage([h], "purple"); yield 0;
+		    var pvt = window.v8SortData[h], i = l - 1; refreshStage([h], "purple"); yield;
 		    for (var j=l; j<h; j++) {
-		        compareCount++; updateCounters(); refreshStage([h, j], "yellow"); yield 0;
+		        compareCount++; updateCounters(); refreshStage([h, j], "yellow"); yield;
 		        if (window.v8SortData[j] < pvt) {
 		            i++; swapCount++; var t=window.v8SortData[i]; window.v8SortData[i]=window.v8SortData[j]; window.v8SortData[j]=t;
-		            refreshStage([i, j], "red"); yield 0;
+		            refreshStage([i, j], "red"); yield;
 		        }
 		    }
 		    swapCount++; var t=window.v8SortData[i+1]; window.v8SortData[i+1]=window.v8SortData[h]; window.v8SortData[h]=t;
-		    refreshStage([i+1, h], "#28a745"); yield 0; return i + 1;
+		    refreshStage([i+1, h], "#28a745"); yield; return i + 1;
 		}
 		
 		function* mergeSortGen(l, r) {
 		    if (l < r) {
 		        var m = Math.floor((l + r) / 2);
-		        yield 0;
 		        yield* mergeSortGen(l, m);
-		        yield 1;
 		        yield* mergeSortGen(m + 1, r);
-		        yield 1;
 		        yield* merge(l, m, r);
-		        yield 2;
 		    }
 		}
 		function* merge(l, m, r) {
@@ -481,13 +455,13 @@ if (reversed == null) { reversed = false; }
 		    var rightArr = window.v8SortData.slice(m + 1, r + 1);
 		    var i = 0, j = 0, k = l;
 		    while (i < leftArr.length && j < rightArr.length) {
-		        compareCount++; updateCounters(); refreshStage([l+i, m+1+j], "yellow"); yield 2;
+		        compareCount++; updateCounters(); refreshStage([l+i, m+1+j], "yellow"); yield;
 		        if (leftArr[i] <= rightArr[j]) { window.v8SortData[k] = leftArr[i]; i++; }
 		        else { window.v8SortData[k] = rightArr[j]; j++; swapCount++; }
-		        refreshStage([k], "red"); yield 2; k++;
+		        refreshStage([k], "red"); yield; k++;
 		    }
-		    while (i < leftArr.length) { window.v8SortData[k] = leftArr[i]; i++; k++; refreshStage([k-1], "#28a745"); yield 2; }
-		    while (j < rightArr.length) { window.v8SortData[k] = rightArr[j]; j++; k++; refreshStage([k-1], "#28a745"); yield 2; }
+		    while (i < leftArr.length) { window.v8SortData[k] = leftArr[i]; i++; k++; refreshStage([k-1], "#28a745"); yield; }
+		    while (j < rightArr.length) { window.v8SortData[k] = rightArr[j]; j++; k++; refreshStage([k-1], "#28a745"); yield; }
 		}
 		
 		// --- Searching Generators ---
@@ -496,31 +470,28 @@ if (reversed == null) { reversed = false; }
 		    while (low <= high) {
 		        var mid = Math.floor((low + high) / 2);
 		        compareCount++; updateCounters(); refreshStage([low, high], "rgba(255,255,255,0.2)");
-		        refreshStage([mid], "yellow"); yield 0;
+		        refreshStage([mid], "yellow"); yield;
 		        if (window.v8SortData[mid] === target) { 
 		            window.v8FoundIdx = mid; // Store result
 		            refreshStage([mid], "#28a745"); 
 		            updateStatus("Found target at index " + mid);
-		            yield 1;
 		            return; 
 		        }
-		        if (window.v8SortData[mid] < target) { low = mid + 1; yield 3; } else { high = mid - 1; yield 2; }
+		        if (window.v8SortData[mid] < target) { low = mid + 1; } else { high = mid - 1; }
+		        yield;
 		    }
 		    updateStatus("Target not found");
 		}
 		function* linearSearchArrayGen(target) {
 		    for(var i=0; i<window.v8SortData.length; i++) {
-		        yield 0;
-		        compareCount++; updateCounters(); refreshStage([i], "yellow"); yield 1;
+		        compareCount++; updateCounters(); refreshStage([i], "yellow"); yield;
 		        if(window.v8SortData[i] === target) { 
 		            window.v8FoundIdx = i; // Store result
 		            refreshStage([i], "#28a745"); 
 		            updateStatus("Found target at index " + i);
-		            yield 1;
 		            return; 
 		        }
 		    }
-		    yield 2;
 		    updateStatus("Target not found");
 		}
 		
@@ -532,13 +503,11 @@ if (reversed == null) { reversed = false; }
 		    }
 		    var curr = window.v8TreeData;
 		    while (curr) {
-		        refreshStage(null, null, curr.val); yield 0;
+		        refreshStage(null, null, curr.val); yield;
 		        if (val < curr.val) {
-		            yield 0;
 		            if (!curr.left) { curr.left = { val: val, left: null, right: null }; break; }
 		            curr = curr.left;
 		        } else if (val > curr.val) {
-		            yield 1;
 		            if (!curr.right) { curr.right = { val: val, left: null, right: null }; break; }
 		            curr = curr.right;
 		        } else return;
@@ -548,20 +517,19 @@ if (reversed == null) { reversed = false; }
 		function* bstSearchGen(val) {
 		    var curr = window.v8TreeData;
 		    while (curr) {
-		        refreshStage(null, "yellow", curr.val); yield 0;
-		        if (curr.val === val) { refreshStage(null, "#28a745", curr.val); yield 2; return; }
-		        if (val < curr.val) { curr = curr.left; yield 0; }
-		        else { curr = curr.right; yield 1; }
+		        refreshStage(null, "yellow", curr.val); yield;
+		        if (curr.val === val) { refreshStage(null, "#28a745", curr.val); return; }
+		        curr = (val < curr.val) ? curr.left : curr.right;
 		    }
 		}
 		function* bstDeleteGen(val) {
 		    function* deleteNodeGen(node) {
 		        if (!node) return null;
-		        refreshStage(null, "yellow", node.val); yield 0;
-		        if (val < node.val) { yield 0; node.left = yield* deleteNodeGen(node.left); return node; }
-		        else if (val > node.val) { yield 1; node.right = yield* deleteNodeGen(node.right); return node; }
+		        refreshStage(null, "yellow", node.val); yield;
+		        if (val < node.val) { node.left = yield* deleteNodeGen(node.left); return node; }
+		        else if (val > node.val) { node.right = yield* deleteNodeGen(node.right); return node; }
 		        else {
-		            refreshStage(null, "red", node.val); yield 2;
+		            refreshStage(null, "red", node.val); yield;
 		            if (!node.left) return node.right; if (!node.right) return node.left;
 		            var successor = node.right; while (successor.left) successor = successor.left;
 		            node.val = successor.val; val = successor.val;
@@ -631,18 +599,14 @@ if (reversed == null) { reversed = false; }
 		};
 		
 		function* linkedListSearchGen(target) {
-		    yield 0;
 		    for (var i=0; i<window.v8ListData.length; i++) {
-		        yield 1;
-		        refreshStage([i], "yellow"); yield 2;
+		        refreshStage([i], "yellow"); yield;
 		        if (window.v8ListData[i] === target) { 
 		            window.v8FoundIdx = i;
 		            refreshStage([i], "#28a745"); 
 		            updateStatus("Found target at index " + i);
-		            yield 2;
 		            return; 
 		        }
-		        yield 3;
 		    }
 		    updateStatus("Target not found");
 		}
@@ -651,7 +615,7 @@ if (reversed == null) { reversed = false; }
 		    window.v8SortData = [];
 		    for(var i=0; i<window.v8ArraySize; i++) window.v8SortData.push(Math.floor(Math.random()*80)+20);
 		    if(window.v8Algo === "binarysearch") window.v8SortData.sort((a,b)=>a-b);
-		    compareCount=0; swapCount=0; updateCounters(); refreshStage(); highlightCode(-1);
+		    compareCount=0; swapCount=0; updateCounters(); refreshStage();
 		}
 		
 		function refreshStage(hArray, hColor, hTreeVal) {
@@ -665,16 +629,16 @@ if (reversed == null) { reversed = false; }
 		        var n = window.v8SortData.length, bw = (drawW/n)*0.8, sp = (drawW/n)*0.2;
 		        for (var i=0; i<n; i++) {
 		            var bh=(window.v8SortData[i]/100)*stageH, b=new createjs.Shape();
-		            var iH = hArray && hArray.indexOf(i) !== -1;
+		            var isH = hArray && hArray.indexOf(i) !== -1;
 		            
 		            // Draw Bar
 		            var isFound = (window.v8FoundIdx === i);
-		            var barColor = (window.v8IsComplete && window.v8Cat === "sorting") ? "#28a745" : (isFound ? "#28a745" : (iH ? hColor : "hsl(200,70%,50%)"));
+		            var barColor = (window.v8IsComplete && window.v8Cat === "sorting") ? "#28a745" : (isFound ? "#28a745" : (isH ? hColor : "hsl(200,70%,50%)"));
 		            b.graphics.beginFill(barColor).drawRect(0,0,bw,-bh);
 		            b.x = offset + i*(bw+sp)+(sp/2); b.y=stageH; root.stageArea.addChild(b);
 		            
 		            // HIGH-CONTRAST PLACARDS (v8.4)
-		            var labelColor = (isFound || iH) ? "#ff0" : "#fff";
+		            var labelColor = (isFound || isH) ? "#ff0" : "#fff";
 		
 		            var fontSize = Math.min(13, bw * 0.9);
 		            if (fontSize > 8) {
@@ -734,17 +698,14 @@ if (reversed == null) { reversed = false; }
 		function* bfsGen(startNode) {
 		    if(!window.v8GraphData.nodes.includes(startNode)) return;
 		    var queue = [startNode], visited = [startNode];
-		    yield 0;
 		    while(queue.length > 0) {
-		        yield 1;
 		        var curr = queue.shift();
-		        refreshStage([curr], "yellow"); yield 2;
+		        refreshStage([curr], "yellow"); yield;
 		        var neighbors = window.v8GraphData.adj[curr] || [];
 		        for(var n of neighbors) {
-		            yield 3;
 		            if(!visited.includes(n)) {
 		                visited.push(n); queue.push(n);
-		                refreshStage([n], "rgba(255,255,0,0.3)"); yield 3;
+		                refreshStage([n], "rgba(255,255,0,0.3)"); yield;
 		            }
 		        }
 		        refreshStage([curr], "#28a745");
@@ -757,16 +718,11 @@ if (reversed == null) { reversed = false; }
 		    while(stack.length > 0) {
 		        var curr = stack.pop();
 		        if(!visited.includes(curr)) {
-		            yield 0;
 		            visited.push(curr);
-		            refreshStage([curr], "yellow"); yield 0;
+		            refreshStage([curr], "yellow"); yield;
 		            var neighbors = window.v8GraphData.adj[curr] || [];
 		            for(var n of neighbors) {
-		                yield 1;
-		                if(!visited.includes(n)) {
-		                    yield 2;
-		                    stack.push(n);
-		                }
+		                if(!visited.includes(n)) stack.push(n);
 		            }
 		        }
 		    }
@@ -797,23 +753,9 @@ if (reversed == null) { reversed = false; }
 		    resetCounters();
 		
 		    refreshStage(); 
-		    highlightCode(-1);
 		}
 		function updateStatus(t) { var el=document.getElementById("v8_status"); if(el) el.innerText=t; }
 		function updateCounters() { var c=document.getElementById("v8_cC"), s=document.getElementById("v8_sC"); if(c) c.innerText=compareCount; if(s) s.innerText=swapCount; }
-		
-		function highlightCode(line) {
-		    var box = document.getElementById("v8_code"); if(!box) return;
-		    for(var i=0; i<10; i++) { 
-		        var el = document.getElementById("v8_l_"+i); 
-		        if(el) { el.style.background="transparent"; el.style.color="#fff"; } 
-		    }
-		    if (line !== undefined && line !== null && line >= 0) {
-		        var target = document.getElementById("v8_l_"+line); 
-		        if(target) { target.style.background="#0e7eff33"; target.style.color="#0e7eff"; }
-		    }
-		}
-		
 		function drawNode(x, y, val, isH, color) {
 		    var c = new createjs.Container(); c.x=x; c.y=y; var s = new createjs.Shape();
 		    s.graphics.beginStroke(isH?(color||"yellow"):"#007bff").setStrokeStyle(3).beginFill(isH?"rgba(255,255,0,0.2)":"#111").drawCircle(0,0,22);
