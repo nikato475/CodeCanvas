@@ -504,11 +504,11 @@ if (reversed == null) { reversed = false; }
 		        }
 		    } else if (window.v8Algo === "quick") {
 		        compareCount = 0; swapCount = 0;
-		        generateTraceFromGen(quickSortGen, 0, n - 1);
+		        generateTraceFromGen(quickSortGen, 0, data.length - 1);
 		        return;
 		    } else if (window.v8Algo === "merge") {
 		        compareCount = 0; swapCount = 0;
-		        generateTraceFromGen(mergeSortGen, 0, n - 1);
+		        generateTraceFromGen(mergeSortGen, 0, data.length - 1);
 		        return;
 		    } else {
 		        return;
