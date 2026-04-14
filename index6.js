@@ -199,17 +199,19 @@ if (reversed == null) { reversed = false; }
 		window.v8SortData = [];
 		window.v8ListData = [10, 20, 30, 40, 50];
 		window.v8TreeData = null; 
-		window.v8GraphData = { nodes: [], adj: {} }; // NEW: Graph Data
-		window.v8Generator = null;
+		window.v8GraphData = { nodes: [], adj: {} };
+		
+		window.v8History = [];   // NEW: Store trace frames
+		window.v8FrameIdx = -1;  // NEW: Current frame pointer
 		
 		window.v8IsPaused = true;
 		window.v8IsComplete = false; 
-		window.v8FoundIdx = -1; // NEW: Persist search result
+		window.v8FoundIdx = -1;
 		window.v8Speed = 500;
 		
 		window.v8Interval = null;
 		window.v8ArraySize = 15;
-		window.v8SessionId = Math.random().toString(36).substr(2, 9); // NEW: Prevent Echo
+		window.v8SessionId = Math.random().toString(36).substr(2, 9);
 		
 		
 		var compareCount = 0;
@@ -232,62 +234,76 @@ if (reversed == null) { reversed = false; }
 		
 		// --- 2. WebSocket & Sync ---
 		var socket = null;
+		
+		function highlightCode(line) {
+		    document.querySelectorAll('[id^="v8_l_"]').forEach(el => {
+		        el.style.backgroundColor = "transparent";
+		        el.style.color = "#ccc";
+		        el.style.borderLeft = "none";
+		    });
+		    var el = document.getElementById("v8_l_" + line);
+		    if(el) {
+		        el.style.backgroundColor = "rgba(14, 126, 255, 0.3)";
+		        el.style.color = "#fff";
+		        el.style.borderLeft = "3px solid #0e7eff";
+		        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		    }
+		}
+
+		function renderFrame(idx) {
+		    if (!window.v8History || idx < 0 || idx >= window.v8History.length) return;
+		    var frame = window.v8History[idx];
+		    window.v8FrameIdx = idx;
+		    
+		    window.v8SortData = frame.data.slice();
+		    compareCount = frame.cmp;
+		    swapCount = frame.swp;
+		    
+		    updateCounters();
+		    highlightCode(frame.line);
+		    refreshStage(frame.highlights, frame.hColor);
+		    
+		    updateStatus("Step " + (idx + 1) + " / " + window.v8History.length + ": " + (frame.msg || ""));
+		}
+
 		function initSocket() {
 		    var check = setInterval(function() {
 		        if (window.io) {
 		            clearInterval(check);
-		            socket = io("http://localhost:3000");
-		            socket.on("connect", () => { updateStatus("Sync Active (v8.1)"); socket.emit("join-room", "sorting-room-1"); });
-		            socket.on("sync-step", (inc) => {
+		            socket = io("https://云端后台地址.com", {
+                    reconnection: false 
+                    });
+		            socket.on("connect", function() { updateStatus("Sync Active (v8.2-Trace)"); socket.emit("join-room", "sorting-room-1"); });
+		            socket.on("sync-step", function(inc) {
 		                if (inc.origin === window.v8SessionId) return; 
 		                
-		                // If it's a structural change (Cat/Algo Switch or Reset)
 		                if (inc.action === "RESET" || inc.action === "UI_CHANGE") {
 		                    window.v8Cat = inc.cat || window.v8Cat;
 		                    window.v8Algo = inc.algo || window.v8Algo;
-		                    updateUIMode(true); // UI update without randomizing data
-		                    window.v8SortData = inc.sortData || window.v8SortData;
-		                    window.v8IsComplete = inc.isComp || false;
-		                    resetCounters();
-		                    refreshStage();
+		                    updateUIMode(true);
+		                    resetProject();
 		                    return;
 		                }
-		
-		                // If we are currently running a local algo, IGNORE all remote data syncs
-		                // to prevent race conditions and "Crazy Shuffling" behavior.
-		                if (!window.v8IsPaused) return;
-		
-		                // Sync data state ONLY when paused
-		                window.v8SortData = inc.sortData || window.v8SortData;
-		                window.v8ListData = inc.listData || window.v8ListData;
-		                window.v8TreeData = inc.treeData || window.v8TreeData;
-		                
-		                if (inc.isComp) { 
-		                    window.v8IsComplete = true; 
-		                    stopAnimation(); 
+
+		                // Multi-player index sync
+		                if (inc.frameIdx !== undefined) {
+		                    renderFrame(inc.frameIdx);
+		                    return;
 		                }
-		                compareCount = inc.cmp || 0; swapCount = inc.swp || 0;
-		                refreshStage(inc.hArray, inc.hColor, inc.hTreeVal);
-		
-		
-		
-		
-		                highlightCode(inc.line);
-		                if (inc.action === "REMOTE_START") { window.v8IsPaused = false; startEngine(); }
-		                else if (inc.action === "REMOTE_PAUSE") window.v8IsPaused = true;
-		                else if (inc.action === "RESET") resetProject();
+
+		                if (!window.v8IsPaused) return;
 		            });
 		        }
 		    }, 200);
 		}
 		
-		function broadcast(msg, hArray, hColor, line, action, hTreeVal) {
+		function broadcast(msg, action, frameIdx) {
 		    if (socket && socket.connected) {
 		        socket.emit("algo-step", {
 		            roomId: "sorting-room-1", origin: window.v8SessionId,
-		            cat: window.v8Cat, algo: window.v8Algo, isComp: window.v8IsComplete,
-		            listData: window.v8ListData, sortData: window.v8SortData, treeData: window.v8TreeData,
-		            cmp: compareCount, swp: swapCount, hArray: hArray, hColor: hColor, line: line, action: action || "AUTO", msg: msg, hTreeVal: hTreeVal
+		            cat: window.v8Cat, algo: window.v8Algo,
+		            frameIdx: frameIdx !== undefined ? frameIdx : window.v8FrameIdx,
+		            action: action || "AUTO", msg: msg
 		        });
 		    }
 		}
@@ -361,66 +377,97 @@ if (reversed == null) { reversed = false; }
 		    renderCode(); refreshStage();
 		}
 		
-		// --- 4. Logic Functions (Restored & Fixed) ---
-		function doStep(isLocal) {
-		    if (window.v8IsComplete) return; // Don't run if already done
-		    if (!window.v8Generator) {
-		        compareCount = 0; swapCount = 0; 
-		        window.v8IsComplete = false;
-		        if(window.v8Algo === "bubble") window.v8Generator = bubbleSortGen();
-		        else if(window.v8Algo === "selection") window.v8Generator = selectionSortGen();
-		        else if(window.v8Algo === "insertion") window.v8Generator = insertionSortGen();
-		        else if(window.v8Algo === "quick") window.v8Generator = quickSortGen(0, window.v8SortData.length-1);
-		        else if(window.v8Algo === "merge") window.v8Generator = mergeSortGen(0, window.v8SortData.length-1);
-		        else return;
-		    }
-		    var res = window.v8Generator.next();
-		    if (res.done) { 
-		        window.v8IsComplete = true; 
-		        stopAnimation(); 
-		        updateStatus("Algorithm Complete!"); 
-		        refreshStage(); 
-		    }
-		    // ALWAYS BROADCAST (isLocal or auto-interval) to keep everyone in sync
-		    broadcast("Step", null, null, null, isLocal ? "MANUAL_STEP" : "AUTO", null);
-		}
-		
-		// --- Sorting Generators ---
-		function* bubbleSortGen() {
-		    for (var i=0; i<window.v8SortData.length-1; i++) {
-		        for (var j=0; j<window.v8SortData.length-i-1; j++) {
-		            compareCount++; updateCounters(); refreshStage([j, j+1], "yellow"); yield;
-		            if (window.v8SortData[j] > window.v8SortData[j+1]) {
-		                swapCount++; updateCounters();
-		                var t=window.v8SortData[j]; window.v8SortData[j]=window.v8SortData[j+1]; window.v8SortData[j+1]=t;
-		                refreshStage([j, j+1], "red"); yield;
+		// --- 4. Logic Functions (Trace-Based) ---
+		function generateTrace() {
+		    window.v8History = [];
+		    var data = window.v8SortData.slice();
+		    
+		    if (window.v8Algo === "bubble") {
+		        var arr = data.slice(), n = arr.length, cmp = 0, swp = 0;
+		        window.v8History.push({ line: 0, data: arr.slice(), cmp: cmp, swp: swp, msg: "开始冒泡排序" });
+		        for (var i = 0; i < n - 1; i++) {
+		            for (var j = 0; j < n - i - 1; j++) {
+		                window.v8History.push({ line: 1, data: arr.slice(), cmp: cmp, swp: swp, msg: "内层循环 j=" + j, highlights: [j, j+1], hColor: "yellow" });
+		                cmp++;
+		                if (arr[j] > arr[j + 1]) {
+		                    window.v8History.push({ line: 2, data: arr.slice(), cmp: cmp, swp: swp, msg: "比较发现 " + arr[j] + " > " + arr[j+1] + "，准备交换", highlights: [j, j+1], hColor: "yellow" });
+		                    swp++;
+		                    var t = arr[j]; arr[j] = arr[j + 1]; arr[j + 1] = t;
+		                    window.v8History.push({ line: 3, data: arr.slice(), cmp: cmp, swp: swp, msg: "交换完成", highlights: [j, j+1], hColor: "red" });
+		                }
+		            }
+		        }
+		    } else if (window.v8Algo === "selection") {
+		        var arr = data.slice(), n = arr.length, cmp = 0, swp = 0;
+		        for (var i = 0; i < n - 1; i++) {
+		            var min_idx = i;
+		            window.v8History.push({ line: 0, data: arr.slice(), cmp: cmp, swp: swp, msg: "设当前最小索引为 " + i, highlights: [i], hColor: "orange" });
+		            for (var j = i + 1; j < n; j++) {
+		                cmp++;
+		                window.v8History.push({ line: 2, data: arr.slice(), cmp: cmp, swp: swp, msg: "比较元素", highlights: [min_idx, j], hColor: "yellow" });
+		                if (arr[j] < arr[min_idx]) {
+		                    min_idx = j;
+		                    window.v8History.push({ line: 1, data: arr.slice(), cmp: cmp, swp: swp, msg: "更新最小索引为 " + j, highlights: [min_idx], hColor: "orange" });
+		                }
+		            }
+		            swp++;
+		            var t = arr[min_idx]; arr[min_idx] = arr[i]; arr[i] = t;
+		            window.v8History.push({ line: 3, data: arr.slice(), cmp: cmp, swp: swp, msg: "交换最小元素到位置 " + i, highlights: [i, min_idx], hColor: "red" });
+		        }
+		    } else if (window.v8Algo === "insertion") {
+		        var arr = data.slice(), n = arr.length, cmp = 0, swp = 0;
+		        for (var i = 1; i < n; i++) {
+		            var key = arr[i], j = i - 1;
+		            window.v8History.push({ line: 1, data: arr.slice(), cmp: cmp, swp: swp, msg: "取出元素 " + key, highlights: [i], hColor: "orange" });
+		            while (j >= 0 && arr[j] > key) {
+		                cmp++;
+		                arr[j + 1] = arr[j];
+		                window.v8History.push({ line: 2, data: arr.slice(), cmp: cmp, swp: swp, msg: "元素后移", highlights: [j, j+1], hColor: "red" });
+		                j--;
+		            }
+		            arr[j + 1] = key;
+		            window.v8History.push({ line: 3, data: arr.slice(), cmp: cmp, swp: swp, msg: "插入位置 " + (j+1), highlights: [j+1], hColor: "#28a745" });
+		        }
+		    } else if (window.v8Algo === "binarysearch") {
+		        var arr = data.slice(), n = arr.length, cmp = 0, target = data[Math.floor(Math.random()*n)];
+		        var low = 0, high = n - 1;
+		        updateStatus("正在搜索目标值: " + target);
+		        while (low <= high) {
+		            var mid = Math.floor((low + high) / 2);
+		            cmp++;
+		            window.v8History.push({ line: 0, data: arr.slice(), cmp: cmp, swp: 0, msg: "检查中间值 index=" + mid, highlights: [mid], hColor: "yellow" });
+		            if (arr[mid] === target) {
+		                window.v8History.push({ line: 1, data: arr.slice(), cmp: cmp, swp: 0, msg: "找到目标！", highlights: [mid], hColor: "#28a745" });
+		                break;
+		            }
+		            if (arr[mid] < target) {
+		                low = mid + 1;
+		                window.v8History.push({ line: 3, data: arr.slice(), cmp: cmp, swp: 0, msg: "目标在右侧，更新 low=" + low, highlights: [low, high], hColor: "rgba(255,255,255,0.2)" });
+		            } else {
+		                high = mid - 1;
+		                window.v8History.push({ line: 2, data: arr.slice(), cmp: cmp, swp: 0, msg: "目标在左侧，更新 high=" + high, highlights: [low, high], hColor: "rgba(255,255,255,0.2)" });
 		            }
 		        }
 		    }
+		    
+		    window.v8History.push({ line: 0, data: data.slice(), cmp: 0, swp: 0, msg: "算法演示结束" });
+		    window.v8FrameIdx = 0;
+		    renderFrame(0);
 		}
-		
-		function* selectionSortGen() {
-		    for (var i=0; i<window.v8SortData.length-1; i++) {
-		        var min=i; refreshStage([min], "orange"); yield;
-		        for (var j=i+1; j<window.v8SortData.length; j++) {
-		            compareCount++; updateCounters(); refreshStage([min, j], "yellow"); yield;
-		            if (window.v8SortData[j] < window.v8SortData[min]) { min=j; refreshStage([min], "orange"); yield; }
-		        }
-		        swapCount++; updateCounters(); var t=window.v8SortData[min]; window.v8SortData[min]=window.v8SortData[i]; window.v8SortData[i]=t;
-		        refreshStage([i, min], "#28a745"); yield;
+
+		function doStep(isLocal) {
+		    if (window.v8History.length === 0) generateTrace();
+		    
+		    if (window.v8FrameIdx < window.v8History.length - 1) {
+		        window.v8FrameIdx++;
+		        renderFrame(window.v8FrameIdx);
+		        if (isLocal) broadcast("Step", "MANUAL");
+		    } else {
+		        window.v8IsComplete = true;
+		        stopAnimation();
 		    }
 		}
 		
-		function* insertionSortGen() {
-		    for (var i=1; i<window.v8SortData.length; i++) {
-		        var key=window.v8SortData[i], j=i-1; refreshStage([i], "orange"); yield;
-		        while(j>=0 && window.v8SortData[j]>key) {
-		            compareCount++; updateCounters(); window.v8SortData[j+1]=window.v8SortData[j];
-		            refreshStage([j, j+1], "red"); yield; j--;
-		        }
-		        window.v8SortData[j+1]=key; refreshStage([j+1], "#28a745"); yield;
-		    }
-		}
 		
 		function* quickSortGen(l, h) {
 		    if (l < h) {
@@ -614,8 +661,10 @@ if (reversed == null) { reversed = false; }
 		function initData() {
 		    window.v8SortData = [];
 		    for(var i=0; i<window.v8ArraySize; i++) window.v8SortData.push(Math.floor(Math.random()*80)+20);
-		    if(window.v8Algo === "binarysearch") window.v8SortData.sort((a,b)=>a-b);
-		    compareCount=0; swapCount=0; updateCounters(); refreshStage();
+		    if(window.v8Algo === "binarysearch") window.v8SortData.sort(function(a,b){return a-b;});
+		    compareCount=0; swapCount=0; updateCounters();
+		    generateTrace();
+		    refreshStage();
 		}
 		
 		function refreshStage(hArray, hColor, hTreeVal) {
@@ -676,20 +725,20 @@ if (reversed == null) { reversed = false; }
 		        var adj = window.v8GraphData.adj;
 		        var nodeCoords = {};
 		        // Layout: Circular
-		        nodes.forEach((n, idx) => {
+		        nodes.forEach(function(n, idx) {
 		            var ang = (idx / nodes.length) * Math.PI * 2;
 		            var nx = offset + drawW/2 + Math.cos(ang) * 120;
 		            var ny = stageH/2 + Math.sin(ang) * 100;
 		            nodeCoords[n] = {x: nx, y: ny};
 		        });
 		        // Draw Edges
-		        nodes.forEach(u => {
-		            (adj[u]||[]).forEach(v => {
+		        nodes.forEach(function(u) {
+		            (adj[u]||[]).forEach(function(v) {
 		                if(u < v) drawLine(nodeCoords[u].x, nodeCoords[u].y, nodeCoords[v].x, nodeCoords[v].y);
 		            });
 		        });
 		        // Draw Nodes
-		        nodes.forEach(n => {
+		        nodes.forEach(function(n) {
 		            var isH = (hArray && hArray.indexOf(n) !== -1);
 		            root.stageArea.addChild(drawNode(nodeCoords[n].x, nodeCoords[n].y, n, isH, hColor));
 		        });
@@ -738,11 +787,10 @@ if (reversed == null) { reversed = false; }
 		    root.stageArea.addChild(drawNode(x, y, node.val, isH, (isH?hColor:"yellow")));
 		}
 		
-		function startEngine() { clearInterval(window.v8Interval); window.v8Interval = setInterval(()=> {if(!window.v8IsPaused) doStep(false);}, window.v8Speed); }
+		function startEngine() { clearInterval(window.v8Interval); window.v8Interval = setInterval(function() {if(!window.v8IsPaused) doStep(false);}, window.v8Speed); }
 		function resetCounters() { compareCount = 0; swapCount = 0; updateCounters(); }
 		function resetProject() { 
 		    clearInterval(window.v8Interval); 
-		    window.v8Generator=null; 
 		    window.v8IsPaused=true; 
 		    window.v8IsComplete=false;
 		    window.v8FoundIdx = -1;
@@ -751,7 +799,7 @@ if (reversed == null) { reversed = false; }
 		    if(window.v8Cat === "linear") window.v8ListData = []; 
 		    if(window.v8Cat === "networks") window.v8GraphData = { nodes: [], adj: {} };
 		    resetCounters();
-		
+		    generateTrace(); // NEW: Pre-calculate history on reset
 		    refreshStage(); 
 		}
 		function updateStatus(t) { var el=document.getElementById("v8_status"); if(el) el.innerText=t; }
@@ -764,9 +812,9 @@ if (reversed == null) { reversed = false; }
 		function drawLine(x1, y1, x2, y2) { var l = new createjs.Shape(); l.graphics.beginStroke("#555").setStrokeStyle(2).moveTo(x1,y1).lineTo(x2,y2); root.stageArea.addChild(l); }
 		function renderCode() { var box = document.getElementById("v8_code"); if(!box) return; box.innerHTML = (pCodes[window.v8Algo].code || []).map((l, i) => `<div id="v8_l_${i}">${l.replace(/ /g, "&nbsp;")}</div>`).join(""); }
 		
-		root.beginBtn.addEventListener("click", () => { window.v8IsPaused=false; startEngine(); broadcast(null,null,null,null,"REMOTE_START"); });
-		root.pauseBtn.addEventListener("click", () => { window.v8IsPaused=true; broadcast(null,null,null,null,"REMOTE_PAUSE"); });
-		root.resetBtn.addEventListener("click", () => { resetProject(); broadcast(null,null,null,null,"RESET"); });
+		root.beginBtn.addEventListener("click", function() { window.v8IsPaused=false; startEngine(); broadcast("Start", "REMOTE_START"); });
+		root.pauseBtn.addEventListener("click", function() { window.v8IsPaused=true; broadcast("Pause", "REMOTE_PAUSE"); });
+		root.resetBtn.addEventListener("click", function() { resetProject(); broadcast("Reset", "RESET"); });
 		
 		setupUI(); initSocket();
 		setTimeout(() => { if(!window.v8SortData.length) initData(); refreshStage(); }, 500);
