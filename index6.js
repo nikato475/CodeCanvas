@@ -293,12 +293,13 @@ if (reversed == null) { reversed = false; }
 		            hColor: hColor,
 		            hTreeVal: hTreeVal,
 		            msg: currentMsg,
-		            line: 0
+		            line: window.v8Line !== undefined ? window.v8Line : -1
 		        });
 		    };
 		    updateStatus = function(msg) { currentMsg = msg; };
 		    updateCounters = function() {}; // Prevent UI reflows during trace capture
 
+		    window.v8Line = -1;
 		    refreshStage(null, null, null); // Initial state
 
 		    var gen = genFunc(...args);
@@ -536,12 +537,16 @@ if (reversed == null) { reversed = false; }
 		function* quickSortGen(l, h) {
 		    if (l < h) {
 		        var p = yield* partition(l, h);
+		        window.v8Line = 2; refreshStage(null, "rgba(255,255,255,0.2)"); yield;
 		        yield* quickSortGen(l, p - 1);
+		        window.v8Line = 3; refreshStage(null, "rgba(255,255,255,0.2)"); yield;
 		        yield* quickSortGen(p + 1, h);
 		    }
 		}
 		function* partition(l, h) {
+		    window.v8Line = 0;
 		    var pvt = window.v8SortData[h], i = l - 1; refreshStage([h], "purple"); yield;
+		    window.v8Line = 1;
 		    for (var j=l; j<h; j++) {
 		        compareCount++; updateCounters(); refreshStage([h, j], "yellow"); yield;
 		        if (window.v8SortData[j] < pvt) {
@@ -556,12 +561,16 @@ if (reversed == null) { reversed = false; }
 		function* mergeSortGen(l, r) {
 		    if (l < r) {
 		        var m = Math.floor((l + r) / 2);
+		        window.v8Line = 0; refreshStage([l, m], "rgba(255,255,255,0.2)"); yield;
 		        yield* mergeSortGen(l, m);
+		        window.v8Line = 1; refreshStage([m + 1, r], "rgba(255,255,255,0.2)"); yield;
 		        yield* mergeSortGen(m + 1, r);
+		        window.v8Line = 2; refreshStage([l, r], "purple"); yield;
 		        yield* merge(l, m, r);
 		    }
 		}
 		function* merge(l, m, r) {
+		    window.v8Line = 2;
 		    var leftArr = window.v8SortData.slice(l, m + 1);
 		    var rightArr = window.v8SortData.slice(m + 1, r + 1);
 		    var i = 0, j = 0, k = l;
@@ -580,29 +589,30 @@ if (reversed == null) { reversed = false; }
 		    var low = 0, high = window.v8SortData.length - 1;
 		    while (low <= high) {
 		        var mid = Math.floor((low + high) / 2);
-		        compareCount++; updateCounters(); refreshStage([low, high], "rgba(255,255,255,0.2)");
+		        window.v8Line = 0; compareCount++; updateCounters(); refreshStage([low, high], "rgba(255,255,255,0.2)");
 		        refreshStage([mid], "yellow"); yield;
 		        if (window.v8SortData[mid] === target) { 
 		            window.v8FoundIdx = mid; // Store result
-		            refreshStage([mid], "#28a745"); 
+		            window.v8Line = 1; refreshStage([mid], "#28a745"); 
 		            updateStatus("Found target at index " + mid);
 		            return; 
 		        }
-		        if (window.v8SortData[mid] < target) { low = mid + 1; } else { high = mid - 1; }
+		        if (window.v8SortData[mid] < target) { window.v8Line = 3; low = mid + 1; } else { window.v8Line = 2; high = mid - 1; }
 		        yield;
 		    }
 		    updateStatus("Target not found");
 		}
 		function* linearSearchArrayGen(target) {
 		    for(var i=0; i<window.v8SortData.length; i++) {
-		        compareCount++; updateCounters(); refreshStage([i], "yellow"); yield;
+		        window.v8Line = 0; compareCount++; updateCounters(); refreshStage([i], "yellow"); yield;
 		        if(window.v8SortData[i] === target) { 
 		            window.v8FoundIdx = i; // Store result
-		            refreshStage([i], "#28a745"); 
+		            window.v8Line = 1; refreshStage([i], "#28a745"); 
 		            updateStatus("Found target at index " + i);
 		            return; 
 		        }
 		    }
+		    window.v8Line = 2;
 		    updateStatus("Target not found");
 		}
 		
@@ -721,14 +731,15 @@ if (reversed == null) { reversed = false; }
 		
 		function* linkedListSearchGen(target) {
 		    for (var i=0; i<window.v8ListData.length; i++) {
-		        refreshStage([i], "yellow"); yield;
+		        window.v8Line = 1; refreshStage([i], "yellow"); yield;
 		        if (window.v8ListData[i] === target) { 
 		            window.v8FoundIdx = i;
-		            refreshStage([i], "#28a745"); 
+		            window.v8Line = 2; refreshStage([i], "#28a745"); 
 		            updateStatus("Found target at index " + i);
 		            return; 
 		        }
 		    }
+		    window.v8Line = 2;
 		    updateStatus("Target not found");
 		}
 		
