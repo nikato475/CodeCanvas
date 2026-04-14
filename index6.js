@@ -448,6 +448,9 @@ if (reversed == null) { reversed = false; }
 		                window.v8History.push({ line: 2, data: arr.slice(), cmp: cmp, swp: 0, msg: "目标在左侧，更新 high=" + high, highlights: [low, high], hColor: "rgba(255,255,255,0.2)" });
 		            }
 		        }
+		    } else {
+		        // Generator-based algorithms (Quick, Merge, and Linear/Hierarchy) skip static trace generation.
+		        return;
 		    }
 		    
 		    window.v8History.push({ line: 0, data: data.slice(), cmp: 0, swp: 0, msg: "算法演示结束" });
@@ -456,12 +459,34 @@ if (reversed == null) { reversed = false; }
 		}
 
 		function doStep(isLocal) {
+		    // 1. Initialize Sorting Generators if needed (for Quick & Merge)
+		    if (!window.v8Generator && (window.v8Algo === "quick" || window.v8Algo === "merge")) {
+		        compareCount = 0; swapCount = 0;
+		        window.v8IsComplete = false;
+		        if (window.v8Algo === "quick") window.v8Generator = quickSortGen(0, window.v8SortData.length - 1);
+		        else if (window.v8Algo === "merge") window.v8Generator = mergeSortGen(0, window.v8SortData.length - 1);
+		    }
+
+		    // 2. Play Generator-based Algorithms (Recursive Sorts & Interactive Trees/Graphs)
+		    if (window.v8Generator) {
+		        var res = window.v8Generator.next();
+		        if (res.done) {
+		            window.v8IsComplete = true;
+		            stopAnimation();
+		            updateStatus("Algorithm Complete!");
+		            refreshStage();
+		        }
+		        // Trigger remote engine to step if local triggered step manually
+		        if (isLocal) broadcast("Step", "MANUAL", -1);
+		        return;
+		    }
+
+		    // 3. Play Trace-based Algorithms (Bubble, Selection, Insertion, BinarySearch)
 		    if (window.v8History.length === 0) generateTrace();
-		    
 		    if (window.v8FrameIdx < window.v8History.length - 1) {
 		        window.v8FrameIdx++;
 		        renderFrame(window.v8FrameIdx);
-		        if (isLocal) broadcast("Step", "MANUAL");
+		        if (isLocal) broadcast("Step", "MANUAL", window.v8FrameIdx);
 		    } else {
 		        window.v8IsComplete = true;
 		        stopAnimation();
