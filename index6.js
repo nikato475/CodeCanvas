@@ -205,9 +205,11 @@ if (reversed == null) { reversed = false; }
 		window.v8FrameIdx = -1;  // NEW: Current frame pointer
 		
 		window.v8IsPaused = true;
+		window.v8IsPaused = true;
 		window.v8IsComplete = false; 
 		window.v8FoundIdx = -1;
 		window.v8Speed = 500;
+		window.v8Generator = null; // FIX: Initialize generator state
 		
 		window.v8Interval = null;
 		window.v8ArraySize = 15;
@@ -255,15 +257,63 @@ if (reversed == null) { reversed = false; }
 		    var frame = window.v8History[idx];
 		    window.v8FrameIdx = idx;
 		    
-		    window.v8SortData = frame.data.slice();
-		    compareCount = frame.cmp;
-		    swapCount = frame.swp;
+		    if (frame.data) window.v8SortData = frame.data.slice();
+		    if (frame.treeData !== undefined) window.v8TreeData = frame.treeData ? JSON.parse(JSON.stringify(frame.treeData)) : null;
+		    if (frame.listData) window.v8ListData = frame.listData.slice();
+		    if (frame.graphData) window.v8GraphData = JSON.parse(JSON.stringify(frame.graphData));
+		    if (frame.foundIdx !== undefined) window.v8FoundIdx = frame.foundIdx;
+
+		    compareCount = frame.cmp !== undefined ? frame.cmp : compareCount;
+		    swapCount = frame.swp !== undefined ? frame.swp : swapCount;
 		    
 		    updateCounters();
-		    highlightCode(frame.line);
-		    refreshStage(frame.highlights, frame.hColor);
+		    highlightCode(frame.line !== undefined ? frame.line : -1);
+		    refreshStage(frame.highlights, frame.hColor, frame.hTreeVal);
 		    
 		    updateStatus("Step " + (idx + 1) + " / " + window.v8History.length + ": " + (frame.msg || ""));
+		}
+
+		function generateTraceFromGen(genFunc, ...args) {
+		    window.v8History = [];
+		    var realRefresh = refreshStage;
+		    var realUpdateStatus = updateStatus;
+		    var realUpdateCounters = updateCounters;
+		    var currentMsg = "";
+		    
+		    refreshStage = function(hArray, hColor, hTreeVal) {
+		        window.v8History.push({
+		            data: window.v8SortData.slice(),
+		            treeData: window.v8TreeData !== undefined ? JSON.parse(JSON.stringify(window.v8TreeData)) : null,
+		            listData: window.v8ListData.slice(),
+		            graphData: JSON.parse(JSON.stringify(window.v8GraphData)),
+		            foundIdx: window.v8FoundIdx,
+		            cmp: compareCount,
+		            swp: swapCount,
+		            highlights: hArray,
+		            hColor: hColor,
+		            hTreeVal: hTreeVal,
+		            msg: currentMsg,
+		            line: 0
+		        });
+		    };
+		    updateStatus = function(msg) { currentMsg = msg; };
+		    updateCounters = function() {}; // Prevent UI reflows during trace capture
+
+		    refreshStage(null, null, null); // Initial state
+
+		    var gen = genFunc(...args);
+		    if (gen && gen.next) {
+		        var res = gen.next();
+		        while(!res.done) res = gen.next();
+		    }
+		    
+		    refreshStage(null, null, null); // Final state
+		    
+		    refreshStage = realRefresh;
+		    updateStatus = realUpdateStatus;
+		    updateCounters = realUpdateCounters;
+		    window.v8FrameIdx = 0;
+		    renderFrame(0);
 		}
 
 		function initSocket() {
@@ -372,6 +422,10 @@ if (reversed == null) { reversed = false; }
 		        ["bfs", "dfs"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text=a.toUpperCase(); aSel.add(o); });
 		    }
 		    aSel.value = window.v8Algo;
+		    if(!aSel.value && aSel.options.length > 0) {
+		        aSel.selectedIndex = 0;
+		        window.v8Algo = aSel.value;
+		    }
 		
 		    if(!skipInit) initData(); 
 		    renderCode(); refreshStage();
@@ -448,8 +502,15 @@ if (reversed == null) { reversed = false; }
 		                window.v8History.push({ line: 2, data: arr.slice(), cmp: cmp, swp: 0, msg: "目标在左侧，更新 high=" + high, highlights: [low, high], hColor: "rgba(255,255,255,0.2)" });
 		            }
 		        }
+		    } else if (window.v8Algo === "quick") {
+		        compareCount = 0; swapCount = 0;
+		        generateTraceFromGen(quickSortGen, 0, n - 1);
+		        return;
+		    } else if (window.v8Algo === "merge") {
+		        compareCount = 0; swapCount = 0;
+		        generateTraceFromGen(mergeSortGen, 0, n - 1);
+		        return;
 		    } else {
-		        // Generator-based algorithms (Quick, Merge, and Linear/Hierarchy) skip static trace generation.
 		        return;
 		    }
 		    
@@ -459,29 +520,6 @@ if (reversed == null) { reversed = false; }
 		}
 
 		function doStep(isLocal) {
-		    // 1. Initialize Sorting Generators if needed (for Quick & Merge)
-		    if (!window.v8Generator && (window.v8Algo === "quick" || window.v8Algo === "merge")) {
-		        compareCount = 0; swapCount = 0;
-		        window.v8IsComplete = false;
-		        if (window.v8Algo === "quick") window.v8Generator = quickSortGen(0, window.v8SortData.length - 1);
-		        else if (window.v8Algo === "merge") window.v8Generator = mergeSortGen(0, window.v8SortData.length - 1);
-		    }
-
-		    // 2. Play Generator-based Algorithms (Recursive Sorts & Interactive Trees/Graphs)
-		    if (window.v8Generator) {
-		        var res = window.v8Generator.next();
-		        if (res.done) {
-		            window.v8IsComplete = true;
-		            stopAnimation();
-		            updateStatus("Algorithm Complete!");
-		            refreshStage();
-		        }
-		        // Trigger remote engine to step if local triggered step manually
-		        if (isLocal) broadcast("Step", "MANUAL", -1);
-		        return;
-		    }
-
-		    // 3. Play Trace-based Algorithms (Bubble, Selection, Insertion, BinarySearch)
 		    if (window.v8History.length === 0) generateTrace();
 		    if (window.v8FrameIdx < window.v8History.length - 1) {
 		        window.v8FrameIdx++;
@@ -490,6 +528,7 @@ if (reversed == null) { reversed = false; }
 		    } else {
 		        window.v8IsComplete = true;
 		        stopAnimation();
+		        updateStatus("Algorithm Complete!");
 		    }
 		}
 		
@@ -633,14 +672,24 @@ if (reversed == null) { reversed = false; }
 		        } else {
 		            if(window.v8GraphData.nodes.indexOf(raw)===-1) window.v8GraphData.nodes.push(raw);
 		        }
-		        refreshStage(); return;
+		        window.v8History = [{
+		            data: window.v8SortData.slice(), treeData: window.v8TreeData ? JSON.parse(JSON.stringify(window.v8TreeData)) : null,
+		            listData: window.v8ListData.slice(), graphData: JSON.parse(JSON.stringify(window.v8GraphData)),
+		            cmp: compareCount, swp: swapCount, msg: "Added " + raw
+		        }];
+                window.v8FrameIdx = 0; renderFrame(0); return;
 		    }
 		    var val = parseInt(raw);
 		    if(window.v8Algo === "binarytree") {
-		        window.v8Generator = bstInsertGen(val);
+		        generateTraceFromGen(bstInsertGen, val);
 		    } else if(window.v8Algo === "linkedlist") {
 		        window.v8ListData.push(val); 
-		        refreshStage(); 
+		        window.v8History = [{
+		            data: window.v8SortData.slice(), treeData: window.v8TreeData ? JSON.parse(JSON.stringify(window.v8TreeData)) : null,
+		            listData: window.v8ListData.slice(), graphData: JSON.parse(JSON.stringify(window.v8GraphData)),
+		            cmp: compareCount, swp: swapCount, msg: "Inserted " + val
+		        }];
+                window.v8FrameIdx = 0; renderFrame(0);
 		        return; 
 		    }
 		    doStep(true); startEngine();
@@ -650,15 +699,15 @@ if (reversed == null) { reversed = false; }
 		    stopAnimation(); window.v8IsPaused = false;
 		    window.v8IsComplete = false; window.v8FoundIdx = -1;
 		    if(window.v8Cat === "networks") {
-		        if(window.v8Algo === "bfs") window.v8Generator = bfsGen(raw);
-		        else if(window.v8Algo === "dfs") window.v8Generator = dfsGen(raw);
+		        if(window.v8Algo === "bfs") generateTraceFromGen(bfsGen, raw);
+		        else if(window.v8Algo === "dfs") generateTraceFromGen(dfsGen, raw);
 		        doStep(true); startEngine(); return;
 		    }
 		    var val = parseInt(raw);
-		    if(window.v8Algo === "linearsearch") window.v8Generator = linearSearchArrayGen(val);
-		    else if(window.v8Algo === "binarysearch") window.v8Generator = binarySearchGen(val);
-		    else if(window.v8Algo === "binarytree") window.v8Generator = bstSearchGen(val);
-		    else if(window.v8Algo === "linkedlist") window.v8Generator = linkedListSearchGen(val);
+		    if(window.v8Algo === "linearsearch") generateTraceFromGen(linearSearchArrayGen, val);
+		    else if(window.v8Algo === "binarysearch") generateTraceFromGen(binarySearchGen, val);
+		    else if(window.v8Algo === "binarytree") generateTraceFromGen(bstSearchGen, val);
+		    else if(window.v8Algo === "linkedlist") generateTraceFromGen(linkedListSearchGen, val);
 		    doStep(true); startEngine();
 		};
 		
@@ -666,7 +715,7 @@ if (reversed == null) { reversed = false; }
 		    var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return;
 		    stopAnimation(); window.v8IsPaused = false;
 		    window.v8IsComplete = false; window.v8FoundIdx = -1; // RESET STATE FOR NEW OP
-		    if(window.v8Algo === "binarytree") window.v8Generator = bstDeleteGen(val);
+		    if(window.v8Algo === "binarytree") generateTraceFromGen(bstDeleteGen, val);
 		    doStep(true); startEngine();
 		};
 		
@@ -819,6 +868,7 @@ if (reversed == null) { reversed = false; }
 		    window.v8IsPaused=true; 
 		    window.v8IsComplete=false;
 		    window.v8FoundIdx = -1;
+		    window.v8Generator = null; // FIX: Ensure old generators don't bleed into new algorithms
 		    if(window.v8Cat === "sorting" || window.v8Cat === "searching") initData();
 		    if(window.v8Cat === "hierarchy") window.v8TreeData = null; 
 		    if(window.v8Cat === "linear") window.v8ListData = []; 
@@ -835,14 +885,14 @@ if (reversed == null) { reversed = false; }
 		    var t = new createjs.Text(val, "bold 13px Arial", isH?"#fff":"#00e5ff"); t.textAlign="center"; t.textBaseline="middle"; c.addChild(s,t); return c;
 		}
 		function drawLine(x1, y1, x2, y2) { var l = new createjs.Shape(); l.graphics.beginStroke("#555").setStrokeStyle(2).moveTo(x1,y1).lineTo(x2,y2); root.stageArea.addChild(l); }
-		function renderCode() { var box = document.getElementById("v8_code"); if(!box) return; box.innerHTML = (pCodes[window.v8Algo].code || []).map((l, i) => `<div id="v8_l_${i}">${l.replace(/ /g, "&nbsp;")}</div>`).join(""); }
+		function renderCode() { var box = document.getElementById("v8_code"); if(!box) return; box.innerHTML = (pCodes[window.v8Algo].code || []).map(function(l, i) { return "<div id='v8_l_" + i + "'>" + l.replace(/ /g, "&nbsp;") + "</div>"; }).join(""); }
 		
 		root.beginBtn.addEventListener("click", function() { window.v8IsPaused=false; startEngine(); broadcast("Start", "REMOTE_START"); });
 		root.pauseBtn.addEventListener("click", function() { window.v8IsPaused=true; broadcast("Pause", "REMOTE_PAUSE"); });
 		root.resetBtn.addEventListener("click", function() { resetProject(); broadcast("Reset", "RESET"); });
 		
 		setupUI(); initSocket();
-		setTimeout(() => { if(!window.v8SortData.length) initData(); refreshStage(); }, 500);
+		setTimeout(function() { if(!window.v8SortData.length) initData(); refreshStage(); }, 500);
 	}
 
 	// actions tween:
