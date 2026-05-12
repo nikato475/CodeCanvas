@@ -224,7 +224,9 @@ if (reversed == null) { reversed = false; }
 		        "  for (int i = 0; i < n - 1; i++) {",
 		        "    for (int j = 0; j < n - i - 1; j++) {",
 		        "      if (arr[j] > arr[j + 1]) {",
-		        "        swap(arr[j], arr[j + 1]);",
+		        "        int temp = arr[j];",
+		        "        arr[j] = arr[j + 1];",
+		        "        arr[j + 1] = temp;",
 		        "      }",
 		        "    }",
 		        "  }",
@@ -239,7 +241,9 @@ if (reversed == null) { reversed = false; }
 		        "        minIdx = j;",
 		        "      }",
 		        "    }",
-		        "    swap(arr[i], arr[minIdx]);",
+		        "    int temp = arr[i];",
+		        "    arr[i] = arr[minIdx];",
+		        "    arr[minIdx] = temp;",
 		        "  }",
 		        "}"
 		    ], t: "O(n²)" },
@@ -263,11 +267,15 @@ if (reversed == null) { reversed = false; }
 		        "    int idx = low;",
 		        "    for (int j = low; j < high; j++) {",
 		        "      if (arr[j] < pivot) {",
-		        "        swap(arr[idx], arr[j]);",
+		        "        int temp = arr[idx];",
+		        "        arr[idx] = arr[j];",
+		        "        arr[j] = temp;",
 		        "        idx++;",
 		        "      }",
 		        "    }",
-		        "    swap(arr[idx], arr[high]);",
+		        "    int temp = arr[idx];",
+		        "    arr[idx] = arr[high];",
+		        "    arr[high] = temp;",
 		        "    quickSort(arr, low, idx - 1);",
 		        "    quickSort(arr, idx + 1, high);",
 		        "  }",
@@ -323,61 +331,89 @@ if (reversed == null) { reversed = false; }
 		        "}"
 		    ], t: "O(n)" },
 		    twopointers: { code: [
-		        "vector<int> twoPointers(int arr[], int n, int target) {",
+		        "int* twoPointers(int arr[], int n, int target) {",
+		        "  int* res = (int*)malloc(2 * sizeof(int));",
+		        "  res[0] = -1; res[1] = -1;",
 		        "  int L = 0, R = n - 1;",
 		        "  while (L < R) {",
 		        "    int sum = arr[L] + arr[R];",
 		        "    if (sum == target) {",
-		        "      return {L, R};",
+		        "      res[0] = L; res[1] = R;",
+		        "      return res;",
 		        "    } else if (sum < target) {",
 		        "      L++;",
 		        "    } else {",
 		        "      R--;",
 		        "    }",
 		        "  }",
-		        "  return {-1, -1};",
+		        "  return res;",
 		        "}"
 		    ], t: "O(n)" },
 		    slidingwindow: { code: [
-		        "int slidingWindow(int arr[], int n, int k) {",
-		        "  int sum = 0, L = 0;",
-		        "  for (int R = 0; R < n; R++) {",
-		        "    sum += arr[R];",
-		        "    if (R - L + 1 > k) {",
-		        "      sum -= arr[L];",
-		        "      L++;",
+		        "int minWindow(int arr[], int n, int target[], int tLen) {",
+		        "  int need[256] = {0};",
+		        "  int window[256] = {0};",
+		        "  for(int i = 0; i < tLen; i++) need[target[i]]++;",
+		        "  int needSize = 0;",
+		        "  for(int i = 0; i < 256; i++) if(need[i] > 0) needSize++;",
+		        "  int left = 0, right = 0, valid = 0;",
+		        "  int start = 0, minLen = 10000;",
+		        "  while (right < n) {",
+		        "    int c = arr[right];",
+		        "    right++;",
+		        "    if (need[c] > 0) {",
+		        "      window[c]++;",
+		        "      if (window[c] == need[c]) valid++;",
+		        "    }",
+		        "    while (valid == needSize) {",
+		        "      if (right - left < minLen) {",
+		        "        start = left; minLen = right - left;",
+		        "      }",
+		        "      int d = arr[left];",
+		        "      left++;",
+		        "      if (need[d] > 0) {",
+		        "        if (window[d] == need[d]) valid--;",
+		        "        window[d]--;",
+		        "      }",
 		        "    }",
 		        "  }",
-		        "  return sum;",
+		        "  return minLen;",
 		        "}"
 		    ], t: "O(n)" },
 		    diffarray: { code: [
 		        "void diffArray(int arr[], int n, int l, int r, int v) {",
 		        "  int diff[n + 1] = {0};",
 		        "  diff[l] += v;",
-		        "  if (r + 1 < n) {",
-		        "    diff[r + 1] -= v;",
+		        "  if (r + 1 < n) diff[r + 1] -= v;",
+		        "  for (int i = 1; i < n; i++) {",
+		        "    diff[i] += diff[i - 1];",
+		        "  }",
+		        "  for (int i = 0; i < n; i++) {",
+		        "    arr[i] += diff[i];",
 		        "  }",
 		        "}"
-		    ], t: "O(1)" },
+		    ], t: "O(n)" },
 		    linkedlist: { code: [
-		        "struct Node { int val; Node* next; };",
+		        "typedef struct Node {",
+		        "  int val;",
+		        "  struct Node* next;",
+		        "} Node;",
 		        "Node* search(Node* head, int target) {",
 		        "  Node* curr = head;",
-		        "  while (curr != nullptr) {",
+		        "  while (curr != NULL) {",
 		        "    if (curr->val == target) {",
 		        "      return curr;",
 		        "    }",
 		        "    curr = curr->next;",
 		        "  }",
-		        "  return nullptr;",
+		        "  return NULL;",
 		        "}"
 		    ], t: "O(n)" },
 		    reverselist: { code: [
 		        "Node* reverseList(Node* head) {",
-		        "  Node* prev = nullptr;",
+		        "  Node* prev = NULL;",
 		        "  Node* curr = head;",
-		        "  while (curr != nullptr) {",
+		        "  while (curr != NULL) {",
 		        "    Node* next = curr->next;",
 		        "    curr->next = prev;",
 		        "    prev = curr;",
@@ -388,7 +424,8 @@ if (reversed == null) { reversed = false; }
 		    ], t: "O(n)" },
 		    mergelist: { code: [
 		        "Node* mergeTwoLists(Node* l1, Node* l2) {",
-		        "  Node dummy(0);",
+		        "  Node dummy;",
+		        "  dummy.val = 0; dummy.next = NULL;",
 		        "  Node* curr = &dummy;",
 		        "  while (l1 && l2) {",
 		        "    if (l1->val < l2->val) {",
@@ -409,9 +446,12 @@ if (reversed == null) { reversed = false; }
 		        "}"
 		    ], t: "O(1)" },
 		    binarytree: { code: [
-		        "struct TreeNode { int val; TreeNode *left, *right; };",
+		        "typedef struct TreeNode {",
+		        "  int val;",
+		        "  struct TreeNode *left, *right;",
+		        "} TreeNode;",
 		        "TreeNode* bstSearch(TreeNode* root, int target) {",
-		        "  if (root == nullptr) return nullptr;",
+		        "  if (root == NULL) return NULL;",
 		        "  if (root->val == target) {",
 		        "    return root;",
 		        "  }",
@@ -428,7 +468,7 @@ if (reversed == null) { reversed = false; }
 		    var check = setInterval(function() {
 		        if (window.io) {
 		            clearInterval(check);
-		            socket = io("http://localhost:3000");
+		            socket = io("http://localhost:3000", { reconnection: false });
 		            socket.on("sync-step", (inc) => {
 		                if (inc.origin === window.v8SessionId) return; 
 		                if (inc.action === "RESET") { resetProject(false); return; }
@@ -458,10 +498,11 @@ if (reversed == null) { reversed = false; }
 		    html += '<div style="font-size:11px; margin-bottom:10px;">ALGORITHM: <select id="v8_algoSelect" style="width:145px; float:right;"></select></div>';
 		    html += '<div id="v8_barArea" style="display:block; margin-top:10px;">Size: <input type="range" id="v8_sizeSlider" min="5" max="40" value="15" style="width:70%;"></div>';
 		    html += '<div id="v8_actionArea" style="display:none; margin-top:10px; border-top:1px solid #333; padding-top:10px;">';
-		    html += '<input type="number" id="v8_val_input" placeholder="Value" style="width:96%; padding:6px; margin-bottom:10px; border-radius:4px; border:none;">';
+		    html += '<input type="text" id="v8_val_input" placeholder="Value" style="width:96%; padding:6px; margin-bottom:10px; border-radius:4px; border:none;">';
 		    html += '<div style="display:flex; flex-wrap:wrap; gap:5px;">';
 		    html += '<button id="v8_insBtn" onclick="window.v8_handleInsert()" style="flex:1; background:#28a745; color:white; border:none; padding:8px; cursor:pointer; font-weight:bold; border-radius:4px;">INSERT</button>';
 		    html += '<button id="v8_searchBtn" onclick="window.v8_handleSearch()" style="flex:1; background:#007bff; color:white; border:none; padding:8px; cursor:pointer; font-weight:bold; border-radius:4px;">SEARCH</button>';
+		    html += '<button id="v8_reverseBtn" onclick="window.v8_handleReverse()" style="flex:1; background:#17a2b8; color:white; border:none; padding:8px; cursor:pointer; font-weight:bold; border-radius:4px; display:none;">REVERSE</button>';
 		    html += '<button id="v8_delBtn" onclick="window.v8_handleDelete()" style="width:100%; margin-top:5px; background:#dc3545; color:white; border:none; padding:8px; cursor:pointer; font-weight:bold; border-radius:4px; display:none;">DELETE</button>';
 		    html += '</div></div>';
 		    html += '<div style="display:flex; gap:5px; margin-top:15px;">';
@@ -479,7 +520,11 @@ if (reversed == null) { reversed = false; }
 		    document.body.appendChild(panel);
 		
 		    document.getElementById("v8_catSelect").onchange = function() { window.v8Cat = this.value; updateUIMode(); resetProject(); };
-		    document.getElementById("v8_algoSelect").onchange = function() { window.v8Algo = this.value; renderCode(); resetProject(); };
+		    document.getElementById("v8_algoSelect").onchange = function() { 
+		        window.v8Algo = this.value; 
+		        updateAlgoUI();
+		        renderCode(); resetProject(); 
+		    };
 		    document.getElementById("v8_speedSlider").oninput = function() { window.v8Speed = parseInt(this.value); if(!window.v8IsPaused) startEngine(); };
 		    document.getElementById("v8_sizeSlider").oninput = function() { window.v8ArraySize = parseInt(this.value); initData(); };
 		    document.getElementById("v8_sizeSlider").onchange = function() { window.v8ArraySize = parseInt(this.value); initData(); };
@@ -488,6 +533,50 @@ if (reversed == null) { reversed = false; }
 		    document.getElementById("v8_timeline").oninput = function() { window.v8IsPaused = true; seekFrame(parseInt(this.value)); };
 		
 		    updateUIMode();
+		}
+		
+		function updateAlgoUI() {
+		    var vI = document.getElementById("v8_val_input");
+		    var insBtn = document.getElementById("v8_insBtn");
+		    var delBtn = document.getElementById("v8_delBtn");
+		    var searchBtn = document.getElementById("v8_searchBtn");
+		    var revBtn = document.getElementById("v8_reverseBtn");
+		    var tlWrap = document.getElementById("v8_timelineWrapper");
+		    var prevBtn = document.getElementById("v8_prevBtn");
+		    
+		    if(vI) {
+		        vI.placeholder = (window.v8Algo === "slidingwindow") ? "e.g. 25, 42, 68" : "Value";
+		        var isGen = false;
+		        
+		        vI.style.display = "block";
+		        if(searchBtn) searchBtn.style.display = "block";
+		        if(revBtn) revBtn.style.display = "none";
+		        
+		        if (window.v8Cat === "linear") {
+		            if (window.v8Algo === "reverselist") {
+		                if(insBtn) insBtn.style.display = "block";
+		                if(delBtn) delBtn.style.display = "none";
+		                if(searchBtn) searchBtn.style.display = "none";
+		                if(revBtn) revBtn.style.display = "block";
+		            } else {
+		                if(insBtn) insBtn.style.display = "block";
+		                if(delBtn) delBtn.style.display = "block";
+		                if(searchBtn) searchBtn.style.display = "block";
+		                if(revBtn) revBtn.style.display = "none";
+		            }
+		            isGen = true;
+		        } else if (window.v8Cat === "hierarchy") {
+		            if(insBtn) insBtn.style.display = "block";
+		            if(delBtn) delBtn.style.display = "block";
+		            isGen = true;
+		        } else {
+		            if(insBtn) insBtn.style.display = "none";
+		            if(delBtn) delBtn.style.display = "none";
+		        }
+		        
+		        if(tlWrap) tlWrap.style.display = isGen ? "none" : "block";
+		        if(prevBtn) prevBtn.style.display = isGen ? "none" : "block";
+		    }
 		}
 		
 		function updateUIMode(skipInit) {
@@ -511,28 +600,27 @@ if (reversed == null) { reversed = false; }
 		        barArea.style.display="none"; actArea.style.display="block"; 
 		        if(delBtn) delBtn.style.display="block"; if(insBtn) insBtn.style.display="block"; if(searchBtn) { searchBtn.style.display="block"; searchBtn.innerText="SEARCH"; }
 		        isGen = true;
-		        ["linkedlist", "reverselist", "mergelist", "deletenode"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text=a.toUpperCase(); aSel.add(o); });
+		        ["linkedlist", "reverselist"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text=a.toUpperCase(); aSel.add(o); });
 		    } else if(window.v8Cat === "hierarchy") {
 		        barArea.style.display="none"; actArea.style.display="block"; 
 		        if(delBtn) delBtn.style.display="block"; if(insBtn) insBtn.style.display="block"; if(searchBtn) { searchBtn.style.display="block"; searchBtn.innerText="SEARCH"; }
 		        isGen = true;
 		        ["binarytree"].forEach(a => { var o=document.createElement("option"); o.value=a; o.text="BST"; aSel.add(o); });
 		    }
-		    if(tlWrap) tlWrap.style.display = isGen ? "none" : "block";
-		    if(prevBtn) prevBtn.style.display = isGen ? "none" : "block";
 		    if(aSel.options.length > 0) {
 		        var found = false;
 		        for(var i=0; i<aSel.options.length; i++) { if(aSel.options[i].value === window.v8Algo) found = true; }
 		        if(!found) window.v8Algo = aSel.options[0].value;
 		        aSel.value = window.v8Algo;
 		    }
+		    updateAlgoUI();
 		    if(!skipInit) initData(); 
 		    renderCode(); refreshStage();
 		}
 		
 		function generateTrace() {
 		    var frames = [];
-		    var data = JSON.parse(JSON.stringify(window.v8SortData));
+		    var data = window.v8SortData ? JSON.parse(JSON.stringify(window.v8SortData)) : [];
 		    var cmp = 0, swp = 0;
 		
 		    function addFrame(f) {
@@ -633,38 +721,150 @@ if (reversed == null) { reversed = false; }
 		            else { R--; addFrame({line:9, hMap: {[L]:"red", [R]:"blue"}}); }
 		        }
 		    } else if (window.v8Algo === "slidingwindow") {
-		        var k = parseInt(document.getElementById("v8_val_input").value);
-		        if (isNaN(k) || k < 1 || k > data.length) k = 3; 
-		        var sum = 0;
-		        for (var i = 0; i < data.length; i++) {
-		            sum += data[i]; 
-		            var hMapO = {}; for(var w=Math.max(0, i-k+1); w<=i; w++) hMapO[w] = "orange";
-		            addFrame({line:3, hMap: hMapO});
-		            if (i >= k - 1) { 
-		                var hMapG = {}; for(var w=i-k+1; w<=i; w++) hMapG[w] = "#28a745";
-		                addFrame({line:5, hMap: hMapG}); 
-		                sum -= data[i - k + 1]; 
+		        var targetStr = document.getElementById("v8_val_input").value;
+		        var parts = targetStr.split(/[,，、\s]+/).map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+		        var dataSet = new Set(data);
+		        var validParts = parts.filter(x => dataSet.has(x));
+		        
+		        if (parts.length === 0 || validParts.length !== parts.length) {
+		            var pickCount = Math.min(data.length, Math.floor(Math.random() * 2) + 2);
+		            var indices = [];
+		            while(indices.length < pickCount) {
+		                var randIdx = Math.floor(Math.random() * data.length);
+		                if(indices.indexOf(randIdx) === -1) indices.push(randIdx);
+		            }
+		            validParts = Array.from(new Set(indices.map(i => data[i])));
+		            document.getElementById("v8_val_input").value = validParts.join(", ");
+		        }
+		        var target = validParts;
+		        
+		        var need = {};
+		        for(var t of target) need[t] = (need[t]||0) + 1;
+		        var needSize = Object.keys(need).length;
+		        
+		        var winMap = {};
+		        var left = 0, right = 0, valid = 0;
+		        var start = 0, minLen = 10000;
+		        
+		        function getW(l, r, s, len, hl, hc) {
+		            var m = {};
+		            for(var i=l; i<=r; i++) m[i] = "orange";
+		            if(len !== 10000) {
+		                for(var i=s; i<s+len; i++) {
+		                    if (m[i]) m[i] = "#d35400"; else m[i] = "#28a745";
+		                }
+		            }
+		            if(hl !== undefined) m[hl] = hc;
+		            return m;
+		        }
+		        
+		        addFrame({line: 1, hMap: getW(left, right-1, start, minLen)});
+		        addFrame({line: 2, hMap: getW(left, right-1, start, minLen)});
+		        
+		        while (right < data.length) {
+		            addFrame({line: 3, hMap: getW(left, right-1, start, minLen)});
+		            var c = data[right];
+		            addFrame({line: 4, hMap: getW(left, right-1, start, minLen, right, "blue")});
+		            right++;
+		            addFrame({line: 5, hMap: getW(left, right-1, start, minLen, right-1, "blue")});
+		            
+		            addFrame({line: 6, hMap: getW(left, right-1, start, minLen, right-1, "blue")});
+		            if (need[c] !== undefined) {
+		                winMap[c] = (winMap[c]||0) + 1;
+		                addFrame({line: 7, hMap: getW(left, right-1, start, minLen, right-1, "red")});
+		                addFrame({line: 8, hMap: getW(left, right-1, start, minLen)});
+		                if (winMap[c] === need[c]) valid++;
+		            }
+		            
+		            addFrame({line: 10, hMap: getW(left, right-1, start, minLen)});
+		            while (valid === needSize) {
+		                addFrame({line: 11, hMap: getW(left, right-1, start, minLen)});
+		                if (right - left < minLen) {
+		                    start = left; minLen = right - left;
+		                    addFrame({line: 12, hMap: getW(left, right-1, start, minLen)});
+		                }
+		                
+		                if (minLen === target.length) {
+		                    break; // Early exit: theoretical minimum reached!
+		                }
+		                
+		                var d = data[left];
+		                addFrame({line: 14, hMap: getW(left, right-1, start, minLen, left, "blue")});
+		                left++;
+		                addFrame({line: 15, hMap: getW(left, right-1, start, minLen, left-1, "blue")});
+		                
+		                addFrame({line: 16, hMap: getW(left, right-1, start, minLen, left-1, "blue")});
+		                if (need[d] !== undefined) {
+		                    addFrame({line: 17, hMap: getW(left, right-1, start, minLen, left-1, "red")});
+		                    if (winMap[d] === need[d]) valid--;
+		                    winMap[d]--;
+		                    addFrame({line: 18, hMap: getW(left, right-1, start, minLen)});
+		                }
+		                addFrame({line: 10, hMap: getW(left, right-1, start, minLen)});
+		            }
+		            if (minLen === target.length) {
+		                break;
 		            }
 		        }
+		        addFrame({line: 22, hMap: getW(-1, -2, start, minLen)});
 		    } else if (window.v8Algo === "diffarray") {
 		        var val = parseInt(document.getElementById("v8_val_input").value);
 		        if (isNaN(val)) { val = 20; document.getElementById("v8_val_input").value = val; }
 		        var l = Math.floor(data.length/4), r = Math.floor(data.length*3/4);
 		        var initMap = {}; for(var w=l; w<=r; w++) initMap[w] = "yellow";
 		        addFrame({line:1, hMap: initMap});
+		        
+		        var origA = [...data];
+		        var diff = new Array(data.length + 1).fill(0);
+		        
+		        diff[l] += val;
 		        data[l] += val;
 		        addFrame({line:2, hMap: {[l]: "red"}});
+		        
 		        var nextR = r + 1;
 		        if(nextR < data.length) {
 		            addFrame({line:3, hMap: {[l]: "red", [nextR]: "orange"}});
+		            diff[nextR] -= val;
 		            data[nextR] -= val;
-		            addFrame({line:4, hMap: {[l]: "red", [nextR]: "blue"}});
+		            addFrame({line:3, hMap: {[l]: "red", [nextR]: "blue"}});
 		        } else {
 		             addFrame({line:3, hMap: {[l]: "red"}});
 		        }
+		        
+		        for (var i = 1; i < data.length; i++) {
+		            addFrame({line:4, hMap: {[i]: "yellow", [i-1]: "green"}});
+		            diff[i] += diff[i-1];
+		            addFrame({line:5, hMap: {[i]: "orange", [i-1]: "green"}});
+		            
+		            addFrame({line:7, hMap: {[i]: "orange", [i-1]: "green"}});
+		            var targetVal = origA[i] + diff[i];
+		            if (data[i] !== targetVal) {
+		                data[i] = targetVal;
+		                addFrame({line:8, hMap: {[i]: "red", [i-1]: "green"}});
+		            } else {
+		                addFrame({line:8, hMap: {[i]: "#28a745", [i-1]: "green"}});
+		            }
+		        }
+		        
+		        var finalMap = {}; for(var w=0; w<data.length; w++) finalMap[w] = "green";
+		        addFrame({line:9, hMap: finalMap});
+		    } else if (window.v8Algo === "reverselist") {
+		        var list = [...window.v8ListData];
+		        addFrame({line:2, list: [...list]});
+		        addFrame({line:3, h:[0], c:"yellow", list: [...list]});
+		        for (var i = 0; i < list.length; i++) {
+		            addFrame({line:4, h:[i], c:"orange", list: [...list], revIdx: i});
+		            addFrame({line:5, h:[i], c:"orange", list: [...list], revIdx: i});
+		            addFrame({line:6, h:[i], c:"orange", list: [...list], revIdx: i+1});
+		            addFrame({line:7, h:[i], c:"#28a745", list: [...list], revIdx: i+1});
+		        }
+		        list.reverse();
+		        addFrame({line:9, list: [...list], revIdx: -1});
 		    }
 		    
-		    frames.push({ data: JSON.parse(JSON.stringify(data)), line: -1, highlights: [], cmp: cmp, swp: swp, isComp: true });
+		    var lastList = frames.length > 0 ? frames[frames.length - 1].list : undefined;
+		    var lastTree = frames.length > 0 ? frames[frames.length - 1].tree : undefined;
+		    frames.push({ data: JSON.parse(JSON.stringify(data)), line: -1, highlights: [], cmp: cmp, swp: swp, isComp: true, list: lastList, tree: lastTree });
 		    var slider = document.getElementById("v8_timeline"); if(slider) { slider.max = frames.length - 1; slider.value = 0; }
 		    return frames;
 		}
@@ -673,11 +873,9 @@ if (reversed == null) { reversed = false; }
 		
 		function doStep(isLocal) {
 		    if (window.v8IsComplete) return;
-		    if (window.v8Cat === "linear" || window.v8Cat === "hierarchy") {
-		        if (window.v8Generator) {
-		            var res = window.v8Generator.next();
-		            if (res.done) { window.v8IsComplete = true; stopAnimation(); }
-		        } else { window.v8IsComplete = true; stopAnimation(); }
+		    if (window.v8Generator) {
+		        var res = window.v8Generator.next();
+		        if (res.done) { window.v8IsComplete = true; stopAnimation(); window.v8Generator = null; }
 		    } else {
 		        if (window.v8Frames.length === 0) window.v8Frames = generateTrace();
 		        if (window.v8CurrentFrame >= window.v8Frames.length) { window.v8IsComplete = true; stopAnimation(); return; }
@@ -745,7 +943,7 @@ if (reversed == null) { reversed = false; }
 		            root.stageArea.addChild(drawNode(x, cY, window.v8ListData[i], !!nColor, nColor));
 		            if(i<window.v8ListData.length-1) {
 		                var revIdx = extra && extra.revIdx !== undefined ? extra.revIdx : -1;
-		                if (i < revIdx) drawLine(x+gap-rad, cY+15, x+rad, cY+15); else drawLine(x+rad, cY, x+gap-rad, cY);
+		                if (i < revIdx) drawLine(x+gap-rad, cY, x+rad, cY); else drawLine(x+rad, cY, x+gap-rad, cY);
 		            }
 		        }
 		    } else if (window.v8Cat === "hierarchy") { renderBSTRecursive(window.v8TreeData, offset+(drawW/2), 60, drawW/4, hTreeVal, hColor); }
@@ -807,8 +1005,21 @@ if (reversed == null) { reversed = false; }
 		
 		function initData() {
 		    if(window.v8Cat === "sorting" || window.v8Cat === "searching" || window.v8Cat === "array_algo") {
-		        window.v8SortData = []; for(var i=0; i<window.v8ArraySize; i++) window.v8SortData.push(Math.floor(Math.random()*80)+20);
+		        window.v8SortData = []; 
+		        for(var i=0; i<window.v8ArraySize; i++) {
+		            window.v8SortData.push(Math.floor(Math.random()*80)+20);
+		        }
 		        if(window.v8Algo === "binarysearch") window.v8SortData.sort((a,b)=>a-b);
+		        resetCounters(); window.v8Frames=[]; window.v8CurrentFrame=0; refreshStage();
+		    } else if (window.v8Cat === "linear") {
+		        if (!window.v8ListData || window.v8ListData.length === 0) {
+		            window.v8ListData = [12, 34, 56, 78, 90];
+		        }
+		        resetCounters(); window.v8Frames=[]; window.v8CurrentFrame=0; refreshStage();
+		    } else if (window.v8Cat === "hierarchy") {
+		        if (!window.v8TreeData) {
+		            window.v8TreeData = { val: 50, left: {val: 25, left: null, right: null}, right: {val: 75, left: null, right: null} };
+		        }
 		        resetCounters(); window.v8Frames=[]; window.v8CurrentFrame=0; refreshStage();
 		    }
 		}
@@ -824,6 +1035,7 @@ if (reversed == null) { reversed = false; }
 		    } 
 		    refreshStage(null, null, null, 9); 
 		}
+		
 		function* linkedListDeleteGen(val) { for(var i=0; i<window.v8ListData.length; i++) { refreshStage([i], "yellow"); yield; if(window.v8ListData[i] === val) { refreshStage([i], "red"); yield; window.v8ListData.splice(i, 1); refreshStage(); return; } } refreshStage(); }
 		
 		function* bstInsertGen(val) {
@@ -886,7 +1098,13 @@ if (reversed == null) { reversed = false; }
 		        if(window.v8Cat==="hierarchy") { 
 		            window.v8Generator = bstSearchGen(val); 
 		        } else if(window.v8Cat==="linear") { 
-		            window.v8Generator = linkedListSearchGen(val); 
+		            if (window.v8Algo === "reverselist") {
+		                window.v8Frames = generateTrace();
+		                window.v8CurrentFrame = 0;
+		                window.v8Generator = null;
+		            } else {
+		                window.v8Generator = linkedListSearchGen(val); 
+		            }
 		        } else if(window.v8Cat==="searching" || window.v8Cat==="array_algo") { 
 		            window.v8Frames = []; 
 		            window.v8CurrentFrame = 0; 
@@ -903,6 +1121,24 @@ if (reversed == null) { reversed = false; }
 		};
 		window.v8_handleDelete = function() { var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return; stopAnimation(); window.v8IsPaused = false; window.v8IsComplete = false; if(window.v8Cat==="hierarchy") window.v8Generator=bstDeleteGen(val); else if(window.v8Cat==="linear") window.v8Generator=linkedListDeleteGen(val); doStep(true); startEngine(); };
 		
+		window.v8_handleReverse = function() {
+		    window.v8Algo = "reverselist";
+		    var aSel = document.getElementById("v8_algoSelect");
+		    if(aSel) aSel.value = "reverselist";
+		    renderCode();
+		    
+		    window.v8Frames = generateTrace();
+		    window.v8CurrentFrame = 0;
+		    window.v8Generator = null;
+		    var tlWrap = document.getElementById("v8_timelineWrapper");
+		    var prevBtn = document.getElementById("v8_prevBtn");
+		    if(tlWrap) tlWrap.style.display = "block";
+		    if(prevBtn) prevBtn.style.display = "block";
+		    
+		    window.v8IsComplete = false;
+		    window.v8IsPaused = false;
+		    startEngine();
+		};
 		root.beginBtn.addEventListener("click", () => { window.v8IsPaused=false; startEngine(); });
 		root.pauseBtn.addEventListener("click", () => { window.v8IsPaused=true; });
 		root.resetBtn.addEventListener("click", () => { resetProject(false); });
