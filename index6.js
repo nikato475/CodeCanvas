@@ -559,10 +559,7 @@ if (reversed == null) { reversed = false; }
 		    var panel = document.createElement("div"); panel.id = "v8_panel";
 		    panel.style.cssText = "position:absolute; left:10px; top:10px; padding:15px; background:rgba(0,0,0,0.9); color:white; border-radius:12px; min-width:250px; width:max-content; z-index:10000; font-family:Arial; box-shadow:0 10px 30px rgba(0,0,0,0.5); border:1px solid #444;";
 		
-		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">';
-		    html += '<span>CodeCanvas</span>';
-		    html += '<input type="text" id="v8_hostIp" placeholder="Server IP" style="width:110px; font-size:10px; padding:2px; background:#222; color:#fff; border:1px solid #555; border-radius:3px; text-align:center;" title="Enter Teacher IP for Sync">';
-		    html += '</div>';
+		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">CodeCanvas</div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="array_algo">ARRAY ALGOS</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option></select></div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">ALGORITHM: <select id="v8_algoSelect" style="width:145px; float:right;"></select></div>';
 		    html += '<div id="v8_barArea" style="display:block; margin-top:10px;">Size: <input type="range" id="v8_sizeSlider" min="5" max="40" value="15" style="width:70%;"></div>';
@@ -587,16 +584,7 @@ if (reversed == null) { reversed = false; }
 		    html += '<div id="v8_code" style="margin-top:8px; padding:10px; background:#1e1e1e; border:1px solid #333; font-family:\'Consolas\', \'Courier New\', monospace; font-size:12px; height:180px; overflow:auto; border-radius:6px; scroll-behavior:smooth; white-space:pre; box-shadow:inset 0 0 10px rgba(0,0,0,0.5);"></div>';
 		    panel.innerHTML = html;
 		    document.body.appendChild(panel);
-		    
-		    var hostInput = document.getElementById("v8_hostIp");
-		    if (hostInput) {
-		        hostInput.value = localStorage.getItem("v8HostIP") || "localhost";
-		        hostInput.onchange = function() {
-		            localStorage.setItem("v8HostIP", this.value.trim());
-		            if (window.io) connectSocket();
-		        };
-		    }
-		
+
 		    document.getElementById("v8_catSelect").onchange = function() { window.v8Cat = this.value; updateUIMode(); resetProject(); };
 		    document.getElementById("v8_algoSelect").onchange = function() { 
 		        window.v8Algo = this.value; 
