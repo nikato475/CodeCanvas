@@ -448,36 +448,102 @@ if (reversed == null) { reversed = false; }
 		    binarytree: { code: [
 		        "typedef struct TreeNode {",
 		        "  int val;",
-		        "  struct TreeNode *left, *right;",
+		        "  struct TreeNode* left;",
+		        "  struct TreeNode* right;",
 		        "} TreeNode;",
-		        "TreeNode* bstSearch(TreeNode* root, int target) {",
-		        "  if (root == NULL) return NULL;",
-		        "  if (root->val == target) {",
+		        "TreeNode* createNode(int val) {",
+		        "  TreeNode* newNode = (TreeNode*)malloc(sizeof(TreeNode));",
+		        "  newNode->val = val;",
+		        "  newNode->left = NULL;",
+		        "  newNode->right = NULL;",
+		        "  return newNode;",
+		        "}",
+		        "TreeNode* insert(TreeNode* root, int val) {",
+		        "  if (root == NULL) {",
+		        "    return createNode(val);",
+		        "  }",
+		        "  if (val < root->val) {",
+		        "    root->left = insert(root->left, val);",
+		        "  } else if (val > root->val) {",
+		        "    root->right = insert(root->right, val);",
+		        "  }",
+		        "  return root;",
+		        "}",
+		        "TreeNode* search(TreeNode* root, int val) {",
+		        "  if (root == NULL || root->val == val) {",
 		        "    return root;",
 		        "  }",
-		        "  if (target < root->val) {",
-		        "    return bstSearch(root->left, target);",
+		        "  if (val < root->val) {",
+		        "    return search(root->left, val);",
 		        "  } else {",
-		        "    return bstSearch(root->right, target);",
+		        "    return search(root->right, val);",
 		        "  }",
+		        "}",
+		        "TreeNode* findMin(TreeNode* root) {",
+		        "  while (root->left != NULL) {",
+		        "    root = root->left;",
+		        "  }",
+		        "  return root;",
+		        "}",
+		        "TreeNode* deleteNode(TreeNode* root, int val) {",
+		        "  if (root == NULL) {",
+		        "    return NULL;",
+		        "  }",
+		        "  if (val < root->val) {",
+		        "    root->left = deleteNode(root->left, val);",
+		        "  } else if (val > root->val) {",
+		        "    root->right = deleteNode(root->right, val);",
+		        "  } else {",
+		        "    if (root->left == NULL && root->right == NULL) {",
+		        "      free(root);",
+		        "      return NULL;",
+		        "    }",
+		        "    else if (root->left == NULL) {",
+		        "      TreeNode* temp = root->right;",
+		        "      free(root);",
+		        "      return temp;",
+		        "    }",
+		        "    else if (root->right == NULL) {",
+		        "      TreeNode* temp = root->left;",
+		        "      free(root);",
+		        "      return temp;",
+		        "    }",
+		        "    else {",
+		        "      TreeNode* minRight = findMin(root->right);",
+		        "      root->val = minRight->val;",
+		        "      root->right = deleteNode(root->right, minRight->val);",
+		        "    }",
+		        "  }",
+		        "  return root;",
 		        "}"
 		    ], t: "O(log n)" }
 		};
 		
+		function connectSocket() {
+		    if (window.socket) window.socket.disconnect();
+		    var host = localStorage.getItem("v8HostIP") || "localhost";
+		    var url = host.startsWith("http") ? host : "http://" + host + ":3000";
+		    window.socket = io(url, { reconnection: false });
+		    window.socket.on("sync-step", (inc) => {
+		        if (inc.origin === window.v8SessionId) return; 
+		        if (inc.action === "RESET") { resetProject(false); return; }
+		        if (inc.action === "REMOTE_START") { window.v8IsPaused=false; startEngine(); return; }
+		        if (inc.action === "REMOTE_PAUSE") { window.v8IsPaused=true; return; }
+		        if (inc.action === "MANUAL_STEP" || inc.action === "AUTO") {
+		            window.v8Frames = [inc.data]; window.v8CurrentFrame = 0; renderFrame(0, true);
+		        }
+		    });
+		}
+		
 		function initSocket() {
+		    var urlParams = new URLSearchParams(window.location.search);
+		    var urlHost = urlParams.get('host');
+		    if (urlHost) localStorage.setItem("v8HostIP", urlHost);
+		    
 		    var check = setInterval(function() {
 		        if (window.io) {
 		            clearInterval(check);
-		            socket = io("http://localhost:3000", { reconnection: false });
-		            socket.on("sync-step", (inc) => {
-		                if (inc.origin === window.v8SessionId) return; 
-		                if (inc.action === "RESET") { resetProject(false); return; }
-		                if (inc.action === "REMOTE_START") { window.v8IsPaused=false; startEngine(); return; }
-		                if (inc.action === "REMOTE_PAUSE") { window.v8IsPaused=true; return; }
-		                if (inc.action === "MANUAL_STEP" || inc.action === "AUTO") {
-		                    window.v8Frames = [inc.data]; window.v8CurrentFrame = 0; renderFrame(0);
-		                }
-		            });
+		            connectSocket();
 		        }
 		    }, 500);
 		}
@@ -493,7 +559,10 @@ if (reversed == null) { reversed = false; }
 		    var panel = document.createElement("div"); panel.id = "v8_panel";
 		    panel.style.cssText = "position:absolute; left:10px; top:10px; padding:15px; background:rgba(0,0,0,0.9); color:white; border-radius:12px; min-width:250px; width:max-content; z-index:10000; font-family:Arial; box-shadow:0 10px 30px rgba(0,0,0,0.5); border:1px solid #444;";
 		
-		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px;">CodeCanvas</div>';
+		    var html = '<div style="font-weight:bold; color:#0e7eff; border-bottom:1px solid #333; margin-bottom:10px; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center;">';
+		    html += '<span>CodeCanvas</span>';
+		    html += '<input type="text" id="v8_hostIp" placeholder="Server IP" style="width:110px; font-size:10px; padding:2px; background:#222; color:#fff; border:1px solid #555; border-radius:3px; text-align:center;" title="Enter Teacher IP for Sync">';
+		    html += '</div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">CATEGORY: <select id="v8_catSelect" style="width:145px; float:right;"><option value="sorting">SORTING</option><option value="searching">SEARCHING</option><option value="array_algo">ARRAY ALGOS</option><option value="linear">LINEAR STRUC</option><option value="hierarchy">HIERARCHY</option></select></div>';
 		    html += '<div style="font-size:11px; margin-bottom:10px;">ALGORITHM: <select id="v8_algoSelect" style="width:145px; float:right;"></select></div>';
 		    html += '<div id="v8_barArea" style="display:block; margin-top:10px;">Size: <input type="range" id="v8_sizeSlider" min="5" max="40" value="15" style="width:70%;"></div>';
@@ -518,6 +587,15 @@ if (reversed == null) { reversed = false; }
 		    html += '<div id="v8_code" style="margin-top:8px; padding:10px; background:#1e1e1e; border:1px solid #333; font-family:\'Consolas\', \'Courier New\', monospace; font-size:12px; height:180px; overflow:auto; border-radius:6px; scroll-behavior:smooth; white-space:pre; box-shadow:inset 0 0 10px rgba(0,0,0,0.5);"></div>';
 		    panel.innerHTML = html;
 		    document.body.appendChild(panel);
+		    
+		    var hostInput = document.getElementById("v8_hostIp");
+		    if (hostInput) {
+		        hostInput.value = localStorage.getItem("v8HostIP") || "localhost";
+		        hostInput.onchange = function() {
+		            localStorage.setItem("v8HostIP", this.value.trim());
+		            if (window.io) connectSocket();
+		        };
+		    }
 		
 		    document.getElementById("v8_catSelect").onchange = function() { window.v8Cat = this.value; updateUIMode(); resetProject(); };
 		    document.getElementById("v8_algoSelect").onchange = function() { 
@@ -568,7 +646,7 @@ if (reversed == null) { reversed = false; }
 		        } else if (window.v8Cat === "hierarchy") {
 		            if(insBtn) insBtn.style.display = "block";
 		            if(delBtn) delBtn.style.display = "block";
-		            isGen = true;
+		            isGen = false;
 		        } else {
 		            if(insBtn) insBtn.style.display = "none";
 		            if(delBtn) delBtn.style.display = "none";
@@ -860,6 +938,129 @@ if (reversed == null) { reversed = false; }
 		        }
 		        list.reverse();
 		        addFrame({line:9, list: [...list], revIdx: -1});
+		    } else if (window.v8Cat === "hierarchy") {
+		        var tree = window.v8TreeData ? JSON.parse(JSON.stringify(window.v8TreeData)) : null;
+		        var tVal = window.v8TreeVal;
+		        
+		        function deepCopyTree(t) { return t ? JSON.parse(JSON.stringify(t)) : null; }
+		        function pF(line, hVal, c) { addFrame({ tree: deepCopyTree(tree), treeVal: hVal, c: c, line: line }); }
+		        
+		        if (window.v8TreeAction === "insert") {
+		            if (!tree) {
+		                pF(13, null, null);
+		                tree = { val: tVal, left: null, right: null };
+		                pF(14, tVal, "#28a745");
+		            } else {
+		                var curr = tree;
+		                var inserted = false;
+		                while (curr && !inserted) {
+		                    pF(16, curr.val, "yellow");
+		                    if (tVal < curr.val) {
+		                        pF(17, curr.val, "yellow");
+		                        if (!curr.left) {
+		                            curr.left = { val: tVal, left: null, right: null };
+		                            pF(17, tVal, "#28a745");
+		                            inserted = true;
+		                        } else {
+		                            curr = curr.left;
+		                        }
+		                    } else if (tVal > curr.val) {
+		                        pF(18, curr.val, "yellow");
+		                        pF(19, curr.val, "yellow");
+		                        if (!curr.right) {
+		                            curr.right = { val: tVal, left: null, right: null };
+		                            pF(19, tVal, "#28a745");
+		                            inserted = true;
+		                        } else {
+		                            curr = curr.right;
+		                        }
+		                    } else {
+		                        pF(20, curr.val, "red"); 
+		                        inserted = true;
+		                    }
+		                }
+		            }
+		        } else if (window.v8TreeAction === "search") {
+		            var curr = tree;
+		            pF(24, null, null);
+		            var found = false;
+		            while (curr && !found) {
+		                pF(24, curr.val, "yellow");
+		                if (curr.val === tVal) {
+		                    pF(25, curr.val, "#28a745");
+		                    found = true;
+		                } else {
+		                    pF(27, curr.val, "yellow");
+		                    if (tVal < curr.val) {
+		                        pF(28, curr.val, "yellow");
+		                        curr = curr.left;
+		                    } else {
+		                        pF(29, curr.val, "yellow");
+		                        pF(30, curr.val, "yellow");
+		                        curr = curr.right;
+		                    }
+		                }
+		            }
+		            if (!found) pF(31, null, null);
+		        } else if (window.v8TreeAction === "delete") {
+		            function delTrace(node, valToDel) {
+		                if (!node) { pF(40, null, null); pF(41, null, null); return null; }
+		                pF(43, node.val, "yellow");
+		                if (valToDel < node.val) {
+		                    pF(44, node.val, "yellow");
+		                    node.left = delTrace(node.left, valToDel);
+		                    return node;
+		                } else if (valToDel > node.val) {
+		                    pF(45, node.val, "yellow");
+		                    pF(46, node.val, "yellow");
+		                    node.right = delTrace(node.right, valToDel);
+		                    return node;
+		                } else {
+		                    pF(47, node.val, "red");
+		                    if (!node.left && !node.right) {
+		                        pF(48, node.val, "red");
+		                        pF(49, node.val, "red");
+		                        pF(50, node.val, "red");
+		                        return null;
+		                    } else if (!node.left) {
+		                        pF(52, node.val, "red");
+		                        pF(53, node.val, "red");
+		                        var temp = node.right;
+		                        pF(54, node.val, "red");
+		                        pF(55, temp.val, "orange");
+		                        return temp;
+		                    } else if (!node.right) {
+		                        pF(57, node.val, "red");
+		                        pF(58, node.val, "red");
+		                        var temp = node.left;
+		                        pF(59, node.val, "red");
+		                        pF(60, temp.val, "orange");
+		                        return temp;
+		                    } else {
+		                        pF(62, node.val, "red");
+		                        pF(63, node.val, "red");
+		                        var minR = node.right;
+		                        pF(34, minR.val, "purple");
+		                        while (minR.left) {
+		                            pF(35, minR.val, "purple");
+		                            minR = minR.left;
+		                            pF(34, minR.val, "purple");
+		                        }
+		                        pF(37, minR.val, "purple");
+		                        
+		                        pF(64, node.val, "red");
+		                        node.val = minR.val;
+		                        pF(64, node.val, "cyan");
+		                        
+		                        pF(65, node.val, "cyan");
+		                        node.right = delTrace(node.right, minR.val);
+		                        return node;
+		                    }
+		                }
+		            }
+		            tree = delTrace(tree, tVal);
+		            pF(68, null, null);
+		        }
 		    }
 		    
 		    var lastList = frames.length > 0 ? frames[frames.length - 1].list : undefined;
@@ -885,21 +1086,25 @@ if (reversed == null) { reversed = false; }
 		}
 		
 		function moveFrame(delta) {
-		    window.v8CurrentFrame = Math.max(0, Math.min(window.v8Frames.length - 1, window.v8CurrentFrame + delta));
-		    renderFrame(window.v8CurrentFrame);
+		    var currentDisplayIdx = Math.max(0, window.v8CurrentFrame - 1);
+		    var targetIdx = Math.max(0, Math.min(window.v8Frames.length - 1, currentDisplayIdx + delta));
+		    seekFrame(targetIdx);
 		}
 		
 		function seekFrame(idx) {
-		    window.v8CurrentFrame = idx;
-		    renderFrame(window.v8CurrentFrame);
+		    window.v8IsComplete = false;
+		    renderFrame(idx);
+		    window.v8CurrentFrame = idx + 1;
+		    if (window.v8CurrentFrame >= window.v8Frames.length) window.v8IsComplete = true;
 		}
 		
-		function renderFrame(idx) {
+		function renderFrame(idx, isRemote) {
 		    var f = window.v8Frames[idx]; if(!f) return;
 		    window.v8SortData = f.data; window.v8ListData = f.list; window.v8TreeData = f.tree;
 		    compareCount = f.cmp; swapCount = f.swp; updateCounters();
 		    refreshStage(f.highlights, f.hColor, f.treeVal, f.line, f.hMap, { revIdx: f.revIdx, l1: f.l1, l2: f.l2, merged: f.merged });
 		    var slider = document.getElementById("v8_timeline"); if(slider) slider.value = idx;
+		    if (!isRemote) broadcast(f, "AUTO");
 		}
 		
 		function refreshStage(hArray, hColor, hTreeVal, line, hMap, extra) {
@@ -1038,53 +1243,15 @@ if (reversed == null) { reversed = false; }
 		
 		function* linkedListDeleteGen(val) { for(var i=0; i<window.v8ListData.length; i++) { refreshStage([i], "yellow"); yield; if(window.v8ListData[i] === val) { refreshStage([i], "red"); yield; window.v8ListData.splice(i, 1); refreshStage(); return; } } refreshStage(); }
 		
-		function* bstInsertGen(val) {
-		    if(!window.v8TreeData) { window.v8TreeData = { val: val, left: null, right: null }; refreshStage(null, "#28a745", val); yield; refreshStage(); return; }
-		    var curr = window.v8TreeData;
-		    while (curr) {
-		        refreshStage(null, "yellow", curr.val); yield;
-		        if (val < curr.val) { if (!curr.left) { curr.left = { val: val, left: null, right: null }; refreshStage(null, "#28a745", val); yield; break; } curr = curr.left; }
-		        else if (val > curr.val) { if (!curr.right) { curr.right = { val: val, left: null, right: null }; refreshStage(null, "#28a745", val); yield; break; } curr = curr.right; }
-		        else break;
-		    }
-		    refreshStage();
-		}
-		function* bstSearchGen(val) { 
-		    var curr = window.v8TreeData; 
-		    refreshStage(null, null, null, 2); yield;
-		    while (curr) { 
-		        refreshStage(null, "yellow", curr.val, 3); yield; 
-		        if (curr.val === val) { refreshStage(null, "#28a745", curr.val, 4); return; } 
-		        refreshStage(null, "yellow", curr.val, 6); yield;
-		        if (val < curr.val) {
-		            curr = curr.left;
-		            refreshStage(null, "yellow", curr.val, 7); yield;
-		        } else {
-		            curr = curr.right;
-		            refreshStage(null, "yellow", curr.val, 9); yield;
-		        }
-		    } 
-		    refreshStage(null, null, null, 11); 
-		}
-		function* bstDeleteGen(val) {
-		    function* deleteNodeGen(node, valToDel) {
-		        if (!node) return null;
-		        refreshStage(null, "yellow", node.val); yield;
-		        if (valToDel < node.val) { node.left = yield* deleteNodeGen(node.left, valToDel); return node; }
-		        else if (valToDel > node.val) { node.right = yield* deleteNodeGen(node.right, valToDel); return node; }
-		        else {
-		            refreshStage(null, "red", node.val); yield;
-		            if (!node.left) return node.right; if (!node.right) return node.left;
-		            var successor = node.right; while (successor.left) successor = successor.left;
-		            refreshStage(null, "purple", successor.val); yield;
-		            node.val = successor.val; refreshStage(null, "orange", node.val); yield;
-		            node.right = yield* deleteNodeGen(node.right, successor.val); return node;
-		        }
-		    }
-		    window.v8TreeData = yield* deleteNodeGen(window.v8TreeData, val); refreshStage();
-		}
-		
-		window.v8_handleInsert = function() { var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return; stopAnimation(); window.v8IsPaused = false; window.v8IsComplete = false; if(window.v8Cat==="hierarchy") window.v8Generator=bstInsertGen(val); else if(window.v8Cat==="linear") window.v8Generator=linkedListInsertGen(val); doStep(true); startEngine(); };
+		window.v8_handleInsert = function() { 
+		    var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return; 
+		    stopAnimation(); window.v8IsPaused = false; window.v8IsComplete = false; 
+		    if(window.v8Cat==="hierarchy") {
+		        window.v8TreeAction = "insert"; window.v8TreeVal = val;
+		        window.v8Frames = generateTrace(); window.v8CurrentFrame = 0; window.v8Generator = null;
+		    } else if(window.v8Cat==="linear") window.v8Generator=linkedListInsertGen(val); 
+		    doStep(true); startEngine(); 
+		};
 		window.v8_handleSearch = function() { 
 		    try {
 		        var valInput = document.getElementById("v8_val_input");
@@ -1096,7 +1263,8 @@ if (reversed == null) { reversed = false; }
 		        window.v8IsComplete = false; 
 		        
 		        if(window.v8Cat==="hierarchy") { 
-		            window.v8Generator = bstSearchGen(val); 
+		            window.v8TreeAction = "search"; window.v8TreeVal = val;
+		            window.v8Frames = generateTrace(); window.v8CurrentFrame = 0; window.v8Generator = null;
 		        } else if(window.v8Cat==="linear") { 
 		            if (window.v8Algo === "reverselist") {
 		                window.v8Frames = generateTrace();
@@ -1119,7 +1287,15 @@ if (reversed == null) { reversed = false; }
 		        console.error(e);
 		    }
 		};
-		window.v8_handleDelete = function() { var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return; stopAnimation(); window.v8IsPaused = false; window.v8IsComplete = false; if(window.v8Cat==="hierarchy") window.v8Generator=bstDeleteGen(val); else if(window.v8Cat==="linear") window.v8Generator=linkedListDeleteGen(val); doStep(true); startEngine(); };
+		window.v8_handleDelete = function() { 
+		    var val = parseInt(document.getElementById("v8_val_input").value); if(isNaN(val)) return; 
+		    stopAnimation(); window.v8IsPaused = false; window.v8IsComplete = false; 
+		    if(window.v8Cat==="hierarchy") {
+		        window.v8TreeAction = "delete"; window.v8TreeVal = val;
+		        window.v8Frames = generateTrace(); window.v8CurrentFrame = 0; window.v8Generator = null;
+		    } else if(window.v8Cat==="linear") window.v8Generator=linkedListDeleteGen(val); 
+		    doStep(true); startEngine(); 
+		};
 		
 		window.v8_handleReverse = function() {
 		    window.v8Algo = "reverselist";
